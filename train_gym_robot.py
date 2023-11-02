@@ -1,7 +1,7 @@
 import gymnasium as gym
 from stable_baselines3 import PPO
 
-env = gym.make("FetchPickAndPlace-v2", render_mode="rgb_array", max_episode_steps=100)
+env = gym.make("FetchReach-v2", render_mode="rgb_array", max_episode_steps=100)
 env.reset()
 obs, reward, terminated, truncated, info = env.step(env.action_space.sample())
 
@@ -10,8 +10,7 @@ model.learn(total_timesteps=1_000_000)
 model.save("model")
 
 env.close()
-env = gym.make("FetchPickAndPlace-v2", render_mode="human", max_episode_steps=100)
-obs, _ = env.reset()
+# obs, _ = env.reset()
 # The following always has to hold:
 # assert reward == env.compute_reward(obs["achieved_goal"], obs["desired_goal"], info)
 # assert truncated == env.compute_truncated(obs["achieved_goal"], obs["desired_goal"], info)
@@ -24,13 +23,13 @@ obs, _ = env.reset()
 # substitute_terminated = env.compute_terminated(obs["achieved_goal"], substitute_goal, info)
 # substitute_truncated = env.compute_truncated(obs["achieved_goal"], substitute_goal, info)
 
-for _ in range(1000):
-   #action = policy(observation)  # User-defined policy function
-   # action = env.action_space.sample()  # User-defined policy function 
-   action, _state = model.predict(obs, deterministic=True)
-   observation, reward, terminated, truncated, info = env.step(action)
+# for _ in range(1000):
+#    #action = policy(observation)  # User-defined policy function
+#    # action = env.action_space.sample()  # User-defined policy function 
+#    action, _state = model.predict(obs, deterministic=True)
+#    observation, reward, terminated, truncated, info = env.step(action)
 
-   obs = observation
-   if terminated or truncated:
-      obs, info = env.reset()
-env.close()
+#    obs = observation
+#    if terminated or truncated:
+#       obs, info = env.reset()
+# env.close()
