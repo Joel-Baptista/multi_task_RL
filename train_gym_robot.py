@@ -1,35 +1,73 @@
+#!/usr/bin/env python3
+
+import argparse
+import os
+from statistics import mean
+import sys
+import shutil
+import yaml
+import pandas as pd
+import torch
+from pathlib import Path
+from colorama import Fore
+from sklearn.model_selection import StratifiedKFold
+import json
+import time
+import math
+import wandb
 import gymnasium as gym
 from stable_baselines3 import PPO
+import torch as T
 
-env = gym.make("FetchReach-v2", render_mode="rgb_array", max_episode_steps=100)
-env.reset()
-obs, reward, terminated, truncated, info = env.step(env.action_space.sample())
+from models import *
+from utils.common import DotDict, model_class_from_str
 
-model = PPO("MultiInputPolicy", env, verbose=1)
-model.learn(total_timesteps=1_000_000)
-model.save("model")
+def main():
+    parser = argparse.ArgumentParser(description='Train asl2text models.')
+    parser.add_argument('-en', '--experiment_name', type=str, required=True)
+    parser.add_argument('-ow', '--overwrite', action='store_true')
 
-env.close()
-# obs, _ = env.reset()
-# The following always has to hold:
-# assert reward == env.compute_reward(obs["achieved_goal"], obs["desired_goal"], info)
-# assert truncated == env.compute_truncated(obs["achieved_goal"], obs["desired_goal"], info)
-# assert terminated == env.compute_terminated(obs["achieved_goal"], obs["desired_goal"], info)
+    arglist = [x for x in sys.argv[1:] if not x.startswith('__')]
+    args = vars(parser.parse_args(args=arglist))
+    
+    overwrite = args['overwrite']
+    experiment_name = args['experiment_name']
+    experiment_path = f'{os.getenv("PHD_MODELS")}/{experiment_name}'
+    
+    # load train config.
+    PHD_ROOT = os.getenv("PHD_ROOT")
+    sys.path.append(PHD_ROOT)
+    cfg_path = f"{PHD_ROOT}/multi_task_RL/experiments/{experiment_name}/train.yaml"
+    with open(cfg_path) as f:
+        cfg = DotDict(yaml.load(f, Loader=yaml.loader.SafeLoader))
+    if os.path.exists(experiment_path):
+        if overwrite:
+            shutil.rmtree(experiment_path)
+            print(f'Removing original {experiment_path}')
+        else:
+            print(f'{experiment_path} already exits. ')
+            raise Exception('Experiment name already exists. If you want to overwrite, use flag -ow')
 
-# However goals can also be substituted:
-# substitute_goal = obs["achieved_goal"].copy()
-# print(substitute_goal)
-# substitute_reward = env.compute_reward(obs["achieved_goal"], substitute_goal, info)
-# substitute_terminated = env.compute_terminated(obs["achieved_goal"], substitute_goal, info)
-# substitute_truncated = env.compute_truncated(obs["achieved_goal"], substitute_goal, info)
+    # create folder to the results.
+    os.makedirs(experiment_path)
+    print(f"Path create: {experiment_path}")
 
-# for _ in range(1000):
-#    #action = policy(observation)  # User-defined policy function
-#    # action = env.action_space.sample()  # User-defined policy function 
-#    action, _state = model.predict(obs, deterministic=True)
-#    observation, reward, terminated, truncated, info = env.step(action)
+    if not cfg.debug: logger = wandb.init(project=cfg.project, config=cfg, name=f"{experiment_name}")
 
-#    obs = observation
-#    if terminated or truncated:
-#       obs, info = env.reset()
-# env.close()
+    # model = model_class_from_str(cfg.model.type)
+
+    env = gym.make("FetchReach-v2", max_episode_steps=100)
+    env.reset()
+    obs, reward, terminated, truncated, info = env.step(env.action_space.sample())
+
+    device = T.device("cuda:0" if T.cuda.is_available() else 'cpu')
+    print(f"device:{device}")
+
+    model = PPO("MultiInputPolicy", env, verbose=1, device=device)
+    model.learn(total_timesteps=1_000_000)
+    model.save("model")
+
+    env.close()
+
+if __name__ == '__main__':
+    main() 
