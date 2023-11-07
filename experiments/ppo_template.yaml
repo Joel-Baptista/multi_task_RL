@@ -1,11 +1,33 @@
-lr: 0.0003
-n_steps: 2048
-batch_size: 64
-n_epochs: 10
-gamma: 0.99
-gae_lambda: 0.95
-clip_range: 0.2
-clip_range_vf: None
-normalize_advantage: True
-
+debug: True
+env: Null
+project: Null
+tasks:
+  - "bottom burner"
+  - "top burner"
+  - "light switch"
+  - "slide cabinet"
+  - "microwave"
+  - "kettle"
+policy: "CostumAC"
+algorithm: 
+  name: "PPO"
+  args:
+      learning_rate: 0.0003
+      n_steps: 2048
+      batch_size: 64
+      n_epochs: 10
+      gamma: 0.99
+      gae_lambda: 0.95
+      clip_range: 0.2
+      clip_range_vf: Null
+      normalize_advantage: True
+      ent_coef: 0.0
+      vf_coef: 0.5
+      max_grad_norm: 0.5
+      use_sde: False
+      sde_sample_freq: -1
+      target_kl: Null
+      stats_window_size: 100
+      seed: Null
+      device: "cuda:0"
 

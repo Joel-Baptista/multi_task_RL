@@ -1,0 +1,219 @@
+wandb_version: 1
+
+debug:
+  desc: null
+  value: false
+env:
+  desc: null
+  value: FrankaKitchen-v1
+project:
+  desc: null
+  value: Kitchen_MultiTask
+total_timesteps:
+  desc: null
+  value: 1000000
+tasks:
+  desc: null
+  value:
+  - bottom burner
+  - top burner
+  - light switch
+  - slide cabinet
+  - microwave
+  - kettle
+policy:
+  desc: null
+  value: CostumAC
+algorithm:
+  desc: null
+  value:
+    name: PPO
+    args:
+      learning_rate: 0.0003
+      n_steps: 2048
+      batch_size: 64
+      n_epochs: 10
+      gamma: 0.99
+      gae_lambda: 0.95
+      clip_range: 0.2
+      clip_range_vf: null
+      normalize_advantage: true
+      ent_coef: 0.0
+      vf_coef: 0.5
+      max_grad_norm: 0.5
+      use_sde: false
+      sde_sample_freq: -1
+      target_kl: null
+      stats_window_size: 100
+      seed: null
+      device: cuda:0
+_wandb:
+  desc: null
+  value:
+    python_version: 3.11.2
+    cli_version: 0.16.0b1
+    framework: torch
+    is_jupyter_run: false
+    is_kaggle_kernel: false
+    start_time: 1699374799.136548
+    t:
+      1:
+      - 1
+      - 55
+      2:
+      - 1
+      - 55
+      3:
+      - 13
+      - 16
+      - 22
+      - 23
+      4: 3.11.2
+      5: 0.16.0b1
+      8:
+      - 5
+      13: linux-x86_64
+algo:
+  desc: null
+  value: PPO
+policy_class:
+  desc: null
+  value: <class 'models.testings.PPO_exp.CostumAC'>
+device:
+  desc: null
+  value: cpu
+verbose:
+  desc: null
+  value: 1
+policy_kwargs:
+  desc: null
+  value: '{}'
+num_timesteps:
+  desc: null
+  value: 0
+_total_timesteps:
+  desc: null
+  value: 1000000
+_num_timesteps_at_start:
+  desc: null
+  value: 0
+seed:
+  desc: null
+  value: None
+action_noise:
+  desc: null
+  value: None
+start_time:
+  desc: null
+  value: 1699374800089911114
+learning_rate:
+  desc: null
+  value: 0.0003
+tensorboard_log:
+  desc: null
+  value: None
+_last_obs:
+  desc: null
+  value: "[[ 1.48478271e-01 -1.76866326e+00  1.84307989e+00 -2.47712416e+00\n   2.60441557e-01\
+    \  7.12017462e-01  1.59611522e+00  4.72939143e-02\n   3.77926433e-02 -8.36415253e-04\
+    \  3.29491454e-04 -6.72030961e-04\n  -2.50448051e-05  8.39439060e-04  2.22297725e-04\
+    \ -9.97366191e-04\n   2.45681703e-05  7.83273506e-04 -3.05445239e-04 -4.97398946e-05\n\
+    \   3.35250091e-05 -4.51653858e-05 -3.91185206e-06 -4.22607776e-05\n   6.27540227e-05\
+    \  4.06665774e-05  4.62657095e-04 -2.28144531e-04\n  -4.66148029e-04 -6.43904741e-03\
+    \ -1.74419064e-03  1.05551782e-03\n  -2.69398693e-01  3.50384277e-01  1.61944527e+00\
+    \  9.99968014e-01\n   4.03299961e-03 -6.59675481e-03 -3.03512640e-04 -1.93978361e-06\n\
+    \   1.51667484e-06  2.12445684e-06 -2.46005825e-07 -1.54506956e-06\n   2.40051948e-06\
+    \  1.42168787e-06  2.15527476e-06 -1.72106526e-06\n   3.35238270e-07 -8.79837815e-07\
+    \ -1.12831227e-05 -2.71027667e-05\n   3.42124035e-05 -1.94527491e-06  2.49853599e-06\
+    \  1.97490191e-06\n   4.85739151e-05  1.04029010e-05  3.58991026e-05  1.08009684e-03\n\
+    \  -7.50000000e-01]]"
+_last_episode_starts:
+  desc: null
+  value: '[ True]'
+_last_original_obs:
+  desc: null
+  value: None
+_episode_num:
+  desc: null
+  value: 0
+use_sde:
+  desc: null
+  value: 'False'
+sde_sample_freq:
+  desc: null
+  value: -1
+_current_progress_remaining:
+  desc: null
+  value: 1.0
+_stats_window_size:
+  desc: null
+  value: 100
+ep_info_buffer:
+  desc: null
+  value: deque([], maxlen=100)
+ep_success_buffer:
+  desc: null
+  value: deque([], maxlen=100)
+_n_updates:
+  desc: null
+  value: 0
+_custom_logger:
+  desc: null
+  value: 'False'
+_vec_normalize_env:
+  desc: null
+  value: None
+observation_space:
+  desc: null
+  value: Box(-inf, inf, (61,), float64)
+action_space:
+  desc: null
+  value: Box(-1.0, 1.0, (9,), float64)
+n_envs:
+  desc: null
+  value: 1
+n_steps:
+  desc: null
+  value: 2048
+gamma:
+  desc: null
+  value: 0.99
+gae_lambda:
+  desc: null
+  value: 0.95
+ent_coef:
+  desc: null
+  value: 0.0
+vf_coef:
+  desc: null
+  value: 0.5
+max_grad_norm:
+  desc: null
+  value: 0.5
+batch_size:
+  desc: null
+  value: 64
+n_epochs:
+  desc: null
+  value: 10
+clip_range:
+  desc: null
+  value: <function constant_fn.<locals>.func at 0x7ff974a7f420>
+clip_range_vf:
+  desc: null
+  value: None
+normalize_advantage:
+  desc: null
+  value: 'True'
+target_kl:
+  desc: null
+  value: None
+lr_schedule:
+  desc: null
+  value: <function constant_fn.<locals>.func at 0x7ff974a7f380>
+rollout_buffer:
+  desc: null
+  value: <stable_baselines3.common.buffers.RolloutBuffer object at 0x7ff974b3a150>
+_logger:
+  desc: null
+  value: <stable_baselines3.common.logger.Logger object at 0x7ff96a23c6d0>
