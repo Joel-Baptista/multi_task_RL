@@ -1,0 +1,28 @@
+2023-11-08 11:24:17,962 INFO    MainThread:21105 [wandb_setup.py:_flush():76] Current SDK version is 0.16.0b1
+2023-11-08 11:24:17,962 INFO    MainThread:21105 [wandb_setup.py:_flush():76] Configure stats pid to 21105
+2023-11-08 11:24:17,962 INFO    MainThread:21105 [wandb_setup.py:_flush():76] Loading settings from /home/joel/.config/wandb/settings
+2023-11-08 11:24:17,962 INFO    MainThread:21105 [wandb_setup.py:_flush():76] Loading settings from /home/joel/PhD/ws/multi_task_RL/wandb/settings
+2023-11-08 11:24:17,962 INFO    MainThread:21105 [wandb_setup.py:_flush():76] Loading settings from environment variables: {}
+2023-11-08 11:24:17,962 INFO    MainThread:21105 [wandb_setup.py:_flush():76] Applying setup settings: {'_disable_service': False}
+2023-11-08 11:24:17,962 INFO    MainThread:21105 [wandb_setup.py:_flush():76] Inferring run settings from compute environment: {'program_relpath': 'train_gym_robot.py', 'program_abspath': '/home/joel/PhD/ws/multi_task_RL/train_gym_robot.py', 'program': '/home/joel/PhD/ws/multi_task_RL/train_gym_robot.py'}
+2023-11-08 11:24:17,963 INFO    MainThread:21105 [wandb_init.py:_log_setup():528] Logging user logs to /home/joel/PhD/ws/multi_task_RL/wandb/run-20231108_112417-12too614/logs/debug.log
+2023-11-08 11:24:17,963 INFO    MainThread:21105 [wandb_init.py:_log_setup():529] Logging internal logs to /home/joel/PhD/ws/multi_task_RL/wandb/run-20231108_112417-12too614/logs/debug-internal.log
+2023-11-08 11:24:17,963 INFO    MainThread:21105 [wandb_init.py:init():568] calling init triggers
+2023-11-08 11:24:17,963 INFO    MainThread:21105 [wandb_init.py:init():575] wandb.init called with sweep_config: {}
+config: {'debug': False, 'env': 'FrankaKitchen-v1', 'project': 'Kitchen_MultiTask', 'total_timesteps': 10000000, 'checkpoints': 10, 'tasks': ['bottom burner', 'top burner', 'light switch', 'slide cabinet', 'microwave', 'kettle'], 'policy': 'CostumAC', 'algorithm': {'name': 'SAC', 'module': 'stable_baselines3', 'args': {'learning_rate': 0.0003, 'buffer_size': 1000000, 'learning_starts': 100, 'batch_size': 256, 'tau': 0.005, 'gamma': 0.99, 'train_freq': 1, 'gradient_steps': 1, 'action_noise': None, 'seed': None, 'device': 'cuda:0'}}}
+2023-11-08 11:24:17,963 INFO    MainThread:21105 [wandb_init.py:init():618] starting backend
+2023-11-08 11:24:17,963 INFO    MainThread:21105 [wandb_init.py:init():622] setting up manager
+2023-11-08 11:24:17,965 INFO    MainThread:21105 [backend.py:_multiprocessing_setup():105] multiprocessing start_methods=fork,spawn,forkserver, using: spawn
+2023-11-08 11:24:17,966 INFO    MainThread:21105 [wandb_init.py:init():628] backend started and connected
+2023-11-08 11:24:17,970 INFO    MainThread:21105 [wandb_init.py:init():720] updated telemetry
+2023-11-08 11:24:17,978 INFO    MainThread:21105 [wandb_init.py:init():753] communicating run to backend with 90.0 second timeout
+2023-11-08 11:24:18,797 INFO    MainThread:21105 [wandb_run.py:_on_init():2220] communicating current version
+2023-11-08 11:24:18,936 INFO    MainThread:21105 [wandb_run.py:_on_init():2229] got version response upgrade_message: "wandb version 0.16.0 is available!  To upgrade, please run:\n $ pip install wandb --upgrade"
+
+2023-11-08 11:24:18,936 INFO    MainThread:21105 [wandb_init.py:init():804] starting run threads in backend
+2023-11-08 11:24:18,979 INFO    MainThread:21105 [wandb_run.py:_console_start():2199] atexit reg
+2023-11-08 11:24:18,979 INFO    MainThread:21105 [wandb_run.py:_redirect():2054] redirect: wrap_raw
+2023-11-08 11:24:18,979 INFO    MainThread:21105 [wandb_run.py:_redirect():2119] Wrapping output streams.
+2023-11-08 11:24:18,980 INFO    MainThread:21105 [wandb_run.py:_redirect():2144] Redirects installed.
+2023-11-08 11:24:18,980 INFO    MainThread:21105 [wandb_init.py:init():845] run started, returning control to user process
+2023-11-08 11:24:28,448 WARNING MsgRouterThr:21105 [router.py:message_loop():77] message_loop has been closed

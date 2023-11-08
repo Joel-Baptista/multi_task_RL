@@ -1,0 +1,78 @@
+wandb_version: 1
+
+debug:
+  desc: null
+  value: false
+env:
+  desc: null
+  value: FrankaKitchen-v1
+project:
+  desc: null
+  value: Kitchen_MultiTask
+total_timesteps:
+  desc: null
+  value: 100000000
+checkpoints:
+  desc: null
+  value: 10
+tasks:
+  desc: null
+  value:
+  - bottom burner
+  - top burner
+  - light switch
+  - slide cabinet
+  - microwave
+  - kettle
+policy:
+  desc: null
+  value: CostumAC
+algorithm:
+  desc: null
+  value:
+    name: PPO
+    args:
+      learning_rate: 0.0003
+      n_steps: 2048
+      batch_size: 64
+      n_epochs: 10
+      gamma: 0.99
+      gae_lambda: 0.95
+      clip_range: 0.2
+      clip_range_vf: null
+      normalize_advantage: true
+      ent_coef: 0.0
+      vf_coef: 0.5
+      max_grad_norm: 0.5
+      use_sde: false
+      sde_sample_freq: -1
+      target_kl: null
+      stats_window_size: 100
+      seed: null
+      device: cuda:0
+_wandb:
+  desc: null
+  value:
+    python_version: 3.11.2
+    cli_version: 0.16.0b1
+    framework: torch
+    is_jupyter_run: false
+    is_kaggle_kernel: false
+    start_time: 1699442371.924607
+    t:
+      1:
+      - 1
+      - 55
+      2:
+      - 1
+      - 55
+      3:
+      - 13
+      - 16
+      - 23
+      - 35
+      4: 3.11.2
+      5: 0.16.0b1
+      8:
+      - 5
+      13: linux-x86_64

@@ -1,26 +1,18 @@
+debug: False
+env: "FrankaKitchen-v1"
 project: "Kitchen_MultiTask"
-total_timesteps: 10_000_000
-checkpoints: 20 
-
-env:
-  name: "FrankaKitchen-v1"
-  args:
-    render_mode: Null # human - rgb_array
-    tasks_to_complete:
-      # - "bottom burner"
-      # - "top burner"
-      # - "light switch"
-      # - "slide cabinet"
-      - "microwave"
-      # - "kettle"
-
-policy: 
-  name: "MlpPolicy"
-  module: "stable_baselines3.ppo.policies"
-
+total_timesteps: 100_000_000
+checkpoints: 10 
+tasks:
+  - "bottom burner"
+  - "top burner"
+  - "light switch"
+  - "slide cabinet"
+  - "microwave"
+  - "kettle"
+policy: "CostumAC"
 algorithm: 
   name: "PPO"
-  module: "stable_baselines3"
   args:
       learning_rate: 0.0003
       n_steps: 2048

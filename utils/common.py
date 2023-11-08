@@ -44,3 +44,26 @@ def model_class_from_str(model_name, model_type=None):
     model_class = getattr(module_name, model_name)
     assert callable(model_class)
     return model_class
+
+
+def class_from_str(module, class_type):
+    """
+    Retrieve the model class based on the provided model name.
+
+    Args:
+        model_name (str): The name of the model.
+
+    Returns:
+        class: The model class corresponding to the provided model name.
+
+    Example:
+        >>> model = model_class_from_str('encoder1')
+        >>> model_instance = model()
+        >>> model_instance.train()
+    """
+
+    module_name = importlib.import_module(module)
+    
+    model_class = getattr(module_name, class_type)
+    assert callable(model_class)
+    return model_class

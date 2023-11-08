@@ -1,0 +1,84 @@
+{
+    "os": "Linux-6.1.0-13-amd64-x86_64-with-glibc2.36",
+    "python": "3.11.2",
+    "heartbeatAt": "2023-11-08T11:24:18.958256",
+    "startedAt": "2023-11-08T11:24:17.960696",
+    "docker": null,
+    "cuda": null,
+    "args": [
+        "-en",
+        "sac",
+        "-ow"
+    ],
+    "state": "running",
+    "program": "/home/joel/PhD/ws/multi_task_RL/train_gym_robot.py",
+    "codePathLocal": "train_gym_robot.py",
+    "codePath": "train_gym_robot.py",
+    "git": {
+        "remote": "git@github.com:Joel-Baptista/multi_task_RL.git",
+        "commit": "1351e564161f8beb893246f344a0d69b55f50b10"
+    },
+    "email": "joelbaptista@ua.pt",
+    "root": "/home/joel/PhD/ws/multi_task_RL",
+    "host": "atem",
+    "username": "joel",
+    "executable": "/home/joel/PhD/.envs/gym-torch/bin/python3",
+    "cpu_count": 4,
+    "cpu_count_logical": 8,
+    "cpu_freq": {
+        "current": 1281.0308750000002,
+        "min": 400.0,
+        "max": 4700.0
+    },
+    "cpu_freq_per_core": [
+        {
+            "current": 1327.228,
+            "min": 400.0,
+            "max": 4700.0
+        },
+        {
+            "current": 1194.45,
+            "min": 400.0,
+            "max": 4700.0
+        },
+        {
+            "current": 1196.391,
+            "min": 400.0,
+            "max": 4700.0
+        },
+        {
+            "current": 1299.939,
+            "min": 400.0,
+            "max": 4700.0
+        },
+        {
+            "current": 1356.008,
+            "min": 400.0,
+            "max": 4700.0
+        },
+        {
+            "current": 1176.935,
+            "min": 400.0,
+            "max": 4700.0
+        },
+        {
+            "current": 1265.847,
+            "min": 400.0,
+            "max": 4700.0
+        },
+        {
+            "current": 1316.876,
+            "min": 400.0,
+            "max": 4700.0
+        }
+    ],
+    "disk": {
+        "/": {
+            "total": 34.53770446777344,
+            "used": 13.208885192871094
+        }
+    },
+    "memory": {
+        "total": 11.332691192626953
+    }
+}

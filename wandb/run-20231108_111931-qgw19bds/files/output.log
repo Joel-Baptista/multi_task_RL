@@ -1,0 +1,15 @@
+device:cpu
+{'learning_rate': 0.0003, 'n_steps': 2048, 'batch_size': 64, 'n_epochs': 10, 'gamma': 0.99, 'gae_lambda': 0.95, 'clip_range': 0.2, 'clip_range_vf': None, 'normalize_advantage': True, 'ent_coef': 0.0, 'vf_coef': 0.5, 'max_grad_norm': 0.5, 'use_sde': False, 'sde_sample_freq': -1, 'target_kl': None, 'stats_window_size': 100, 'seed': None, 'device': 'cuda:0'}
+Traceback (most recent call last):
+  File "/home/joel/PhD/ws/multi_task_RL/train_gym_robot.py", line 140, in <module>
+    main()
+  File "/home/joel/PhD/ws/multi_task_RL/train_gym_robot.py", line 117, in main
+    print(f"Algorithm class: {class_from_str(cfg.algorithm.module, cfg.algorithm.name)}")
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/joel/PhD/ws/multi_task_RL/utils/common.py", line 65, in class_from_str
+    mdoule_name = importlib.import_module(mdoule)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.11/importlib/__init__.py", line 117, in import_module
+    if name.startswith('.'):
+       ^^^^^^^^^^^^^^^
+AttributeError: 'NoneType' object has no attribute 'startswith'
