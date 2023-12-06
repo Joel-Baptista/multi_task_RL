@@ -18,7 +18,7 @@ from wandb.integration.sb3 import WandbCallback
 # Reinforcement Learning
 import gymnasium as gym
 from gymnasium import Env, ObservationWrapper, spaces
-from stable_baselines3 import PPO
+from stable_baselines3 import PPO, SAC
 import torch as T
 
 # My Own
@@ -92,6 +92,7 @@ def main():
    print(f"Path create: {experiment_path}")
 
    env = gym.make("FrankaKitchen-v1", render_mode="human",tasks_to_complete=["microwave"])
+   env.metadata['render_fps'] = 30
    env = ObsWrap(env)
    env.reset()
    obs, reward, terminated, truncated, info = env.step(env.action_space.sample())
@@ -99,7 +100,7 @@ def main():
    device = T.device("cuda:0" if T.cuda.is_available() else 'cpu')
    print(f"device:{device}")
    print(cfg.algorithm.args)
-   model = PPO.load(f"{experiment_path}/model0.zip", env)
+   model = PPO.load(f"{experiment_path}/model5.zip", env)
 
    print(model.policy)
 

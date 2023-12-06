@@ -11,6 +11,7 @@ from colorama import Fore
 import math
 import numpy as np
 from typing import SupportsFloat, TypeVar
+from tqdm import tqdm
 
 # Logs
 import wandb
@@ -192,7 +193,7 @@ def main():
         model = algorithm_class(policy_class, env, verbose=1, tensorboard_log=f"{experiment_path}/{run.id}",**cfg.algorithm.args)
     
         print(model.policy)
-        for i in range(0, cfg.checkpoints): 
+        for i in tqdm(range(0, cfg.checkpoints)): 
             model.learn(
                 total_timesteps=int(cfg.total_timesteps / cfg.checkpoints),
                 callback=WandbCallback(
@@ -202,8 +203,10 @@ def main():
             model.save(f"{experiment_path}/model{i}")
     else:
         model = algorithm_class(policy_class, env, verbose=1, **cfg.algorithm.args)
-        model.learn(total_timesteps=cfg.total_timesteps)
-
+        print(model.policy)
+        for i in tqdm(range(0, cfg.checkpoints)): 
+            model.learn(total_timesteps=int(cfg.total_timesteps / cfg.checkpoints))
+            
     wandb.finish()
     env.close()
 
