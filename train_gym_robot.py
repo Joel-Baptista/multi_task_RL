@@ -53,9 +53,9 @@ class RewWrap(RewardWrapper):
         
         observation, reward, terminated, truncated, info = self.env.step(action)
 
-        delta_objective = abs(observation['achieved_goal']['microwave'][0] - observation['desired_goal']['microwave'][0])
+        # delta_objective = abs(observation['achieved_goal']['microwave'][0] - observation['desired_goal']['microwave'][0])
 
-        reward = 10 * reward - delta_objective / 10
+        reward = 10 * reward
         return observation, self.reward(reward), terminated, truncated, info
 
 
@@ -165,11 +165,11 @@ def main():
     
     device = T.device("cuda:0" if T.cuda.is_available() else 'cpu')
     env = gym.make(cfg.env.name, **cfg.env.args)
-    env = RewWrap(env)
+    # env = RewWrap(env)
     env = ObsWrap(env)
     env.reset()
     obs, reward, terminated, truncated, info = env.step(env.action_space.sample())
-
+    print(env.observation_space.shape)
     print(env.reward_range)
     
     print(f"device:{device}")
@@ -193,14 +193,15 @@ def main():
         model = algorithm_class(policy_class, env, verbose=1, tensorboard_log=f"{experiment_path}/{run.id}",**cfg.algorithm.args)
     
         print(model.policy)
-        for i in tqdm(range(0, cfg.checkpoints)): 
-            model.learn(
-                total_timesteps=int(cfg.total_timesteps / cfg.checkpoints),
-                callback=WandbCallback(
-                    verbose=2
-                    )
+        model.learn(
+            total_timesteps=cfg.total_timesteps,
+            callback=WandbCallback(
+                verbose=2,
+                model_save_path=experiment_path,
+                model_save_freq= int(cfg.total_timesteps / cfg.checkpoints),
+                log = "all"
                 )
-            model.save(f"{experiment_path}/model{i}")
+            )
     else:
         model = algorithm_class(policy_class, env, verbose=1, **cfg.algorithm.args)
         print(model.policy)

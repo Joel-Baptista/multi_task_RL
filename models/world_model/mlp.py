@@ -2,7 +2,7 @@ import collections
 import itertools
 
 import gin
-import torch
+import torch 
 from torch import nn
 
 from models.utils import init_module
@@ -14,6 +14,7 @@ class MLP(nn.Module):
                  inp_dim,
                  outp_dim,
                  hidden_dims,
+                 lr=0.0001,
                  hidden_activation=nn.ReLU,
                  outp_layer=nn.Linear,
                  outp_activation=nn.Identity,
@@ -35,6 +36,7 @@ class MLP(nn.Module):
         self.b_init_last = bias_init_last
         self.outp_scaling = outp_scaling
         self.add_bn_input = add_bn_input
+        self.reparam_noise = 1e-6 # JB's
         if add_bn_input:
             assert not legacy_bn_first
 
@@ -62,12 +64,18 @@ class MLP(nn.Module):
 
             current_dim = hidden_dim
 
-        layers.append(outp_layer(current_dim, outp_dim))
-        if outp_activation is not None:
-            layers.append(outp_activation())
+        # JB's
+        # layers.append(outp_layer(current_dim, outp_dim))
+        # if outp_activation is not None:
+        #     layers.append(outp_activation())
 
         self.layers = nn.Sequential(*layers)
+        self.mu = nn.Linear(current_dim, outp_dim)
+        self.sigma = nn.Linear(current_dim, outp_dim)
+
         self.init()
+
+        self.optim = torch.optim.Adam(self.parameters(), lr=lr)
 
     def init(self):
         for module in self.modules():
@@ -89,12 +97,18 @@ class MLP(nn.Module):
 
         x = inp
         for idx, layer in enumerate(self.layers):
+
             x = layer(x)
+        
+        # JB's
+        mu = self.mu(x)
+        sigma = torch.sigmoid(self.sigma(x))
+        sigma = torch.clamp(sigma, min=self.reparam_noise, max=1) #clamp is faster than sigmoid function
 
         if self.outp_scaling != 1:
-            x = self.outp_scaling * x
+            mu = self.outp_scaling * mu
 
-        return x
+        return mu, sigma
 
 
 @gin.configurable(denylist=['inp_dim', 'outp_dim'])

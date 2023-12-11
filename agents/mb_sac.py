@@ -18,8 +18,12 @@ from stable_baselines3.common.noise import ActionNoise, VectorizedActionNoise
 
 # JB's
 from utils.common import DotDict, model_class_from_str, class_from_str
+import math
+from influence_estimation.kl_torch import kl_div
 
 SelfSAC = TypeVar("SelfSAC", bound="SAC")
+_LOG_2PI = math.log(2 * math.pi)
+
 
 
 class SAC(OffPolicyAlgorithm):
@@ -163,7 +167,13 @@ class SAC(OffPolicyAlgorithm):
         if _init_setup_model:
             self._setup_model()
 
-        self.world_model = class_from_str(f"models.{world_model}", world_model.upper())(10, 10, [256, 256])
+        # JB's
+        self.world_model = class_from_str(f"models.world_model.{world_model}", world_model.upper())(
+            inp_dim = env.action_space.shape[0] + env.observation_space.shape[0], 
+            outp_dim = env.observation_space.shape[0], 
+            hidden_dims = [4156, 2048, 512, 206]
+            )
+        self.world_model.to(self.device)
         print(self.world_model)
 
     def _setup_model(self) -> None:
@@ -218,11 +228,25 @@ class SAC(OffPolicyAlgorithm):
         self._update_learning_rate(optimizers)
 
         ent_coef_losses, ent_coefs = [], []
-        actor_losses, critic_losses = [], []
+        actor_losses, critic_losses, world_model_losses = [], [], []
 
         for gradient_step in range(gradient_steps):
             # Sample replay buffer
             replay_data = self.replay_buffer.sample(batch_size, env=self._vec_normalize_env)  # type: ignore[union-attr]
+
+            model_inp = th.concat((replay_data.observations, replay_data.actions), dim=1).type(th.float32)
+
+            mu_next, sigma_next = self.world_model(model_inp)
+
+            model_loss = 0.5 * (((replay_data.next_observations.type(th.float32) - mu_next) ** 2) / (sigma_next) + th.log(sigma_next) + _LOG_2PI)
+            model_loss = model_loss.mean()
+
+            self.world_model.optim.zero_grad()
+            model_loss.backward()
+            self.world_model.optim.step()
+
+            world_model_losses.append(model_loss.item())
+
 
             # We need to sample because `log_std` may have changed between two gradient steps
             if self.use_sde:
@@ -261,7 +285,12 @@ class SAC(OffPolicyAlgorithm):
                 # add entropy term
                 next_q_values = next_q_values - ent_coef * next_log_prob.reshape(-1, 1)
                 # td error + entropy term
-                target_q_values = replay_data.rewards + (1 - replay_data.dones) * self.gamma * next_q_values
+
+                cai = self.calc_causal_influence(replay_data.observations).unsqueeze(1)
+
+                rewards = replay_data.rewards + cai
+                
+                target_q_values = rewards + (1 - replay_data.dones) * self.gamma * next_q_values
 
             # Get current Q-values estimates for each critic network
             # using action from the replay buffer
@@ -302,8 +331,51 @@ class SAC(OffPolicyAlgorithm):
         self.logger.record("train/ent_coef", np.mean(ent_coefs))
         self.logger.record("train/actor_loss", np.mean(actor_losses))
         self.logger.record("train/critic_loss", np.mean(critic_losses))
+        self.logger.record("train/world_model_loss", np.mean(world_model_losses))
+        self.logger.record("train/cai", np.mean(
+            cai.squeeze(1).detach().cpu().numpy()
+            ))
         if len(ent_coef_losses) > 0:
             self.logger.record("train/ent_coef_loss", np.mean(ent_coef_losses))
+
+    @th.no_grad()
+    def calc_causal_influence(self, states: th.Tensor):
+        cai = 0
+        K = 2
+
+        all_kls = th.zeros((self.batch_size, K)).to(self.device)
+
+        # Get transition distribution with action        
+        mu_mean, log_std, _ = self.actor.get_action_dist_params(states)
+
+        for j in range(0, K):
+            actions = self.actor.action_dist.actions_from_params(mu_mean, log_std, deterministic=False, **{})
+            
+            model_inp = th.concat((states, actions), dim=1).type(th.float32)
+            mu_next_ac, sigma_next_ac = self.world_model(model_inp)
+
+            # Get transition distribution with action averaged out
+            all_actions = th.zeros((K, self.batch_size, *self.action_space.shape)).to(self.device)
+            for i in range(0, K):
+                actions = self.actor.action_dist.actions_from_params(mu_mean, log_std, deterministic=False, **{})
+                
+                all_actions[i] = actions.unsqueeze(0)
+
+            model_inp = th.concat((states.repeat((K, 1)), all_actions.view(-1, *self.action_space.shape)), dim=1).type(th.float32)
+
+            mu_next, sigma_next = self.world_model(model_inp)
+
+            mu_next = mu_next.view(self.batch_size, K, -1).mean(dim=1)
+            sigma_next = sigma_next.view(self.batch_size, K, -1).mean(dim=1)
+
+            kls = kl_div(mu_next_ac, sigma_next_ac, mu_next, sigma_next)
+            kls = th.clip(kls, min=0)
+            
+            all_kls[:, j] = kls
+
+        cai = th.mean(all_kls, dim=1)
+
+        return cai
 
     def learn(
         self: SelfSAC,
@@ -323,105 +395,105 @@ class SAC(OffPolicyAlgorithm):
             progress_bar=progress_bar,
         )
     
-    def collect_rollouts(
-        self,
-        env: VecEnv,
-        callback: BaseCallback,
-        train_freq: TrainFreq,
-        replay_buffer: ReplayBuffer,
-        action_noise: Optional[ActionNoise] = None,
-        learning_starts: int = 0,
-        log_interval: Optional[int] = None,
-    ) -> RolloutReturn:
-        """
-        Collect experiences and store them into a ``ReplayBuffer``.
+    # def collect_rollouts(
+    #     self,
+    #     env: VecEnv,
+    #     callback: BaseCallback,
+    #     train_freq: TrainFreq,
+    #     replay_buffer: ReplayBuffer,
+    #     action_noise: Optional[ActionNoise] = None,
+    #     learning_starts: int = 0,
+    #     log_interval: Optional[int] = None,
+    # ) -> RolloutReturn:
+    #     """
+    #     Collect experiences and store them into a ``ReplayBuffer``.
 
-        :param env: The training environment
-        :param callback: Callback that will be called at each step
-            (and at the beginning and end of the rollout)
-        :param train_freq: How much experience to collect
-            by doing rollouts of current policy.
-            Either ``TrainFreq(<n>, TrainFrequencyUnit.STEP)``
-            or ``TrainFreq(<n>, TrainFrequencyUnit.EPISODE)``
-            with ``<n>`` being an integer greater than 0.
-        :param action_noise: Action noise that will be used for exploration
-            Required for deterministic policy (e.g. TD3). This can also be used
-            in addition to the stochastic policy for SAC.
-        :param learning_starts: Number of steps before learning for the warm-up phase.
-        :param replay_buffer:
-        :param log_interval: Log data every ``log_interval`` episodes
-        :return:
-        """
-        # Switch to eval mode (this affects batch norm / dropout)
-        self.policy.set_training_mode(False)
+    #     :param env: The training environment
+    #     :param callback: Callback that will be called at each step
+    #         (and at the beginning and end of the rollout)
+    #     :param train_freq: How much experience to collect
+    #         by doing rollouts of current policy.
+    #         Either ``TrainFreq(<n>, TrainFrequencyUnit.STEP)``
+    #         or ``TrainFreq(<n>, TrainFrequencyUnit.EPISODE)``
+    #         with ``<n>`` being an integer greater than 0.
+    #     :param action_noise: Action noise that will be used for exploration
+    #         Required for deterministic policy (e.g. TD3). This can also be used
+    #         in addition to the stochastic policy for SAC.
+    #     :param learning_starts: Number of steps before learning for the warm-up phase.
+    #     :param replay_buffer:
+    #     :param log_interval: Log data every ``log_interval`` episodes
+    #     :return:
+    #     """
+    #     # Switch to eval mode (this affects batch norm / dropout)
+    #     self.policy.set_training_mode(False)
 
-        num_collected_steps, num_collected_episodes = 0, 0
+    #     num_collected_steps, num_collected_episodes = 0, 0
 
-        assert isinstance(env, VecEnv), "You must pass a VecEnv"
-        assert train_freq.frequency > 0, "Should at least collect one step or episode."
+    #     assert isinstance(env, VecEnv), "You must pass a VecEnv"
+    #     assert train_freq.frequency > 0, "Should at least collect one step or episode."
 
-        if env.num_envs > 1:
-            assert train_freq.unit == TrainFrequencyUnit.STEP, "You must use only one env when doing episodic training."
+    #     if env.num_envs > 1:
+    #         assert train_freq.unit == TrainFrequencyUnit.STEP, "You must use only one env when doing episodic training."
 
-        # Vectorize action noise if needed
-        if action_noise is not None and env.num_envs > 1 and not isinstance(action_noise, VectorizedActionNoise):
-            action_noise = VectorizedActionNoise(action_noise, env.num_envs)
+    #     # Vectorize action noise if needed
+    #     if action_noise is not None and env.num_envs > 1 and not isinstance(action_noise, VectorizedActionNoise):
+    #         action_noise = VectorizedActionNoise(action_noise, env.num_envs)
 
-        if self.use_sde:
-            self.actor.reset_noise(env.num_envs)
+    #     if self.use_sde:
+    #         self.actor.reset_noise(env.num_envs)
 
-        callback.on_rollout_start()
-        continue_training = True
-        while should_collect_more_steps(train_freq, num_collected_steps, num_collected_episodes):
-            if self.use_sde and self.sde_sample_freq > 0 and num_collected_steps % self.sde_sample_freq == 0:
-                # Sample a new noise matrix
-                self.actor.reset_noise(env.num_envs)
+    #     callback.on_rollout_start()
+    #     continue_training = True
+    #     while should_collect_more_steps(train_freq, num_collected_steps, num_collected_episodes):
+    #         if self.use_sde and self.sde_sample_freq > 0 and num_collected_steps % self.sde_sample_freq == 0:
+    #             # Sample a new noise matrix
+    #             self.actor.reset_noise(env.num_envs)
 
-            # Select action randomly or according to policy
-            actions, buffer_actions = self._sample_action(learning_starts, action_noise, env.num_envs)
+    #         # Select action randomly or according to policy
+    #         actions, buffer_actions = self._sample_action(learning_starts, action_noise, env.num_envs)
 
-            # Rescale and perform action
-            new_obs, rewards, dones, infos = env.step(actions)
+    #         # Rescale and perform action
+    #         new_obs, rewards, dones, infos = env.step(actions)
 
-            self.num_timesteps += env.num_envs
-            num_collected_steps += 1
+    #         self.num_timesteps += env.num_envs
+    #         num_collected_steps += 1
 
-            # Give access to local variables
-            callback.update_locals(locals())
-            # Only stop training if return value is False, not when it is None.
-            if callback.on_step() is False:
-                return RolloutReturn(num_collected_steps * env.num_envs, num_collected_episodes, continue_training=False)
+    #         # Give access to local variables
+    #         callback.update_locals(locals())
+    #         # Only stop training if return value is False, not when it is None.
+    #         if callback.on_step() is False:
+    #             return RolloutReturn(num_collected_steps * env.num_envs, num_collected_episodes, continue_training=False)
 
-            # Retrieve reward and episode length if using Monitor wrapper
-            self._update_info_buffer(infos, dones)
+    #         # Retrieve reward and episode length if using Monitor wrapper
+    #         self._update_info_buffer(infos, dones)
 
-            # Store data in replay buffer (normalized action and unnormalized observation)
-            self._store_transition(replay_buffer, buffer_actions, new_obs, rewards, dones, infos)
+    #         # Store data in replay buffer (normalized action and unnormalized observation)
+    #         self._store_transition(replay_buffer, buffer_actions, new_obs, rewards, dones, infos)
 
-            self._update_current_progress_remaining(self.num_timesteps, self._total_timesteps)
+    #         self._update_current_progress_remaining(self.num_timesteps, self._total_timesteps)
 
-            # For DQN, check if the target network should be updated
-            # and update the exploration schedule
-            # For SAC/TD3, the update is dones as the same time as the gradient update
-            # see https://github.com/hill-a/stable-baselines/issues/900
-            self._on_step()
+    #         # For DQN, check if the target network should be updated
+    #         # and update the exploration schedule
+    #         # For SAC/TD3, the update is dones as the same time as the gradient update
+    #         # see https://github.com/hill-a/stable-baselines/issues/900
+    #         self._on_step()
 
-            for idx, done in enumerate(dones):
-                if done:
-                    # Update stats
-                    num_collected_episodes += 1
-                    self._episode_num += 1
+    #         for idx, done in enumerate(dones):
+    #             if done:
+    #                 # Update stats
+    #                 num_collected_episodes += 1
+    #                 self._episode_num += 1
 
-                    if action_noise is not None:
-                        kwargs = dict(indices=[idx]) if env.num_envs > 1 else {}
-                        action_noise.reset(**kwargs)
+    #                 if action_noise is not None:
+    #                     kwargs = dict(indices=[idx]) if env.num_envs > 1 else {}
+    #                     action_noise.reset(**kwargs)
 
-                    # Log training infos
-                    if log_interval is not None and self._episode_num % log_interval == 0:
-                        self._dump_logs()
-        callback.on_rollout_end()
+    #                 # Log training infos
+    #                 if log_interval is not None and self._episode_num % log_interval == 0:
+    #                     self._dump_logs()
+    #     callback.on_rollout_end()
 
-        return RolloutReturn(num_collected_steps * env.num_envs, num_collected_episodes, continue_training)
+    #     return RolloutReturn(num_collected_steps * env.num_envs, num_collected_episodes, continue_training)
 
 
     def _excluded_save_params(self) -> List[str]:

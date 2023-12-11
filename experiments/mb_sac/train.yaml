@@ -24,13 +24,13 @@ algorithm:
       learning_rate: 0.0003
       buffer_size: 1_000_000
       learning_starts: 100
-      batch_size: 256
+      batch_size: 1024
       tau: 0.005
       gamma: 0.99
       train_freq: 1
       gradient_steps: 1
       action_noise: Null
       seed: Null
-      device: "cuda:0"
+      device: "cuda:1"
       world_model: "mlp"
 

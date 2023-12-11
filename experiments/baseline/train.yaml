@@ -39,4 +39,4 @@ algorithm:
       target_kl: Null
       stats_window_size: 100
       seed: Null
-      device: "cuda:0"
+      device: "cuda:1"
