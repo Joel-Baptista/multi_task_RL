@@ -20,6 +20,7 @@ from stable_baselines3.common.noise import ActionNoise, VectorizedActionNoise
 from utils.common import DotDict, model_class_from_str, class_from_str
 import math
 from influence_estimation.kl_torch import kl_div
+import time
 
 SelfSAC = TypeVar("SelfSAC", bound="SAC")
 _LOG_2PI = math.log(2 * math.pi)
@@ -236,9 +237,9 @@ class SAC(OffPolicyAlgorithm):
 
             model_inp = th.concat((replay_data.observations, replay_data.actions), dim=1).type(th.float32)
 
-            mu_next, sigma_next = self.world_model(model_inp)
+            mu_next, log_std_next = self.world_model(model_inp)
 
-            model_loss = 0.5 * (((replay_data.next_observations.type(th.float32) - mu_next) ** 2) / (sigma_next) + th.log(sigma_next) + _LOG_2PI)
+            model_loss = 0.5 * (((replay_data.next_observations.type(th.float32) - mu_next) ** 2) * (-log_std_next).exp() + log_std_next + _LOG_2PI)
             model_loss = model_loss.mean()
 
             self.world_model.optim.zero_grad()
@@ -246,7 +247,6 @@ class SAC(OffPolicyAlgorithm):
             self.world_model.optim.step()
 
             world_model_losses.append(model_loss.item())
-
 
             # We need to sample because `log_std` may have changed between two gradient steps
             if self.use_sde:
@@ -287,6 +287,10 @@ class SAC(OffPolicyAlgorithm):
                 # td error + entropy term
 
                 cai = self.calc_causal_influence(replay_data.observations).unsqueeze(1)
+                # cai2 = self.calc_causal_influence_2(replay_data.observations).unsqueeze(1)
+
+                # print(f"cai: {cai.mean()}")
+                # print(f"cai2: {cai2.mean()}")
 
                 rewards = replay_data.rewards + cai
                 
@@ -338,43 +342,139 @@ class SAC(OffPolicyAlgorithm):
         if len(ent_coef_losses) > 0:
             self.logger.record("train/ent_coef_loss", np.mean(ent_coef_losses))
 
+    # @th.no_grad()
+    # def calc_causal_influence(self, states: th.Tensor):
+    #     st = time.time()
+    #     cai = 0
+    #     K = 64
+
+    #     all_kls = th.zeros((self.batch_size, K)).to(self.device)
+    #     all_mu_next = th.zeros((K,)).to(self.device)
+    #     all_mu_next_ac = th.zeros((K,)).to(self.device)
+    #     all_log_std_next_ac = th.zeros((K,)).to(self.device)
+    #     all_log_std_next = th.zeros((K,)).to(self.device)
+
+    #     # Get transition distribution with action        
+    #     mu_mean, log_std, _ = self.actor.get_action_dist_params(states)
+
+    #     for j in range(0, K):
+    #         actions = self.actor.action_dist.actions_from_params(mu_mean, log_std, deterministic=False, **{})
+            
+    #         model_inp = th.concat((states, actions), dim=1).type(th.float32)
+    #         mu_next_ac, log_std_next_ac = self.world_model(model_inp)
+
+    #         # Get transition distribution with action averaged out
+    #         all_actions = th.zeros((K, self.batch_size, *self.action_space.shape)).to(self.device)
+    #         for i in range(0, K):
+    #             actions = self.actor.action_dist.actions_from_params(mu_mean, log_std, deterministic=False, **{})
+                
+    #             all_actions[i] = actions.unsqueeze(0)
+
+    #         model_inp = th.concat((states.repeat((K, 1)), all_actions.view(-1, *self.action_space.shape)), dim=1).type(th.float32)
+
+    #         mu_next, log_std_next = self.world_model(model_inp)
+
+    #         mu_next = mu_next.view(self.batch_size, K, -1).mean(dim=1)
+    #         log_std_next = log_std_next.view(self.batch_size, K, -1).mean(dim=1)
+
+    #         all_log_std_next[i] = log_std_next.mean()
+    #         all_log_std_next_ac[i] = log_std_next_ac.mean()
+    #         all_mu_next_ac[i] = mu_next_ac.mean()
+    #         all_mu_next[i] = mu_next.mean()
+
+    #         kls = kl_div(mu_next_ac, log_std_next_ac.exp() ** 2, mu_next, log_std_next.exp() ** 2)
+    #         kls = th.clip(kls, min=0)
+            
+    #         all_kls[:, j] = kls
+
+    #     self.logger.record("train/mu_next_ac", all_mu_next_ac.mean().detach().cpu().numpy())
+    #     self.logger.record("train/mu_next", all_mu_next.mean().detach().cpu().numpy())
+    #     self.logger.record("train/sigma_next_ac", all_log_std_next_ac.mean().detach().cpu().numpy())
+    #     self.logger.record("train/sigma_next", all_log_std_next.mean().detach().cpu().numpy())        
+
+    #     cai = th.mean(all_kls, dim=1)
+    #     print(f"CAI time: {time.time() - st}")
+    #     return cai
+
+
     @th.no_grad()
     def calc_causal_influence(self, states: th.Tensor):
+        st = time.time()
         cai = 0
-        K = 2
+        K = 64
 
-        all_kls = th.zeros((self.batch_size, K)).to(self.device)
+        # all_kls = th.zeros((self.batch_size, K)).to(self.device)
+        # all_mu_next = th.zeros((K,)).to(self.device)
+        # all_mu_next_ac = th.zeros((K,)).to(self.device)
+        # all_log_std_next_ac = th.zeros((K,)).to(self.device)
+        # all_log_std_next = th.zeros((K,)).to(self.device)
 
         # Get transition distribution with action        
         mu_mean, log_std, _ = self.actor.get_action_dist_params(states)
 
+        # print(f"mu_mean: {mu_mean.shape}")
+
+        outer_actions = th.zeros((K, self.batch_size, *self.action_space.shape)).to(self.device)
+        outer_states = th.zeros((K, self.batch_size, *self.observation_space.shape)).to(self.device)
+
         for j in range(0, K):
             actions = self.actor.action_dist.actions_from_params(mu_mean, log_std, deterministic=False, **{})
-            
-            model_inp = th.concat((states, actions), dim=1).type(th.float32)
-            mu_next_ac, sigma_next_ac = self.world_model(model_inp)
+            outer_actions[j] = actions
+            outer_states[j] = states
+        
+        outer_states = outer_states.view(K * self.batch_size, *self.observation_space.shape)
+        outer_actions = outer_actions.view(K * self.batch_size, *self.action_space.shape)
 
-            # Get transition distribution with action averaged out
-            all_actions = th.zeros((K, self.batch_size, *self.action_space.shape)).to(self.device)
-            for i in range(0, K):
-                actions = self.actor.action_dist.actions_from_params(mu_mean, log_std, deterministic=False, **{})
-                
-                all_actions[i] = actions.unsqueeze(0)
+        model_inp = th.concat((outer_states, outer_actions), dim=1).type(th.float32)
+        outer_mu_next, outer_log_std_next = self.world_model(model_inp)
 
-            model_inp = th.concat((states.repeat((K, 1)), all_actions.view(-1, *self.action_space.shape)), dim=1).type(th.float32)
+        # Get transition distribution with action averaged out
+        inner_actions = th.zeros((K, self.batch_size, *self.action_space.shape)).to(self.device)
+        for i in range(0, K):
+            actions = self.actor.action_dist.actions_from_params(mu_mean, log_std, deterministic=False, **{})
+            inner_actions[i] = actions
 
-            mu_next, sigma_next = self.world_model(model_inp)
+        # outer_states = outer_states.view(K * self.batch_size, *self.observation_space.shape)
+        inner_actions = inner_actions.view(K * self.batch_size, *self.action_space.shape)
 
-            mu_next = mu_next.view(self.batch_size, K, -1).mean(dim=1)
-            sigma_next = sigma_next.view(self.batch_size, K, -1).mean(dim=1)
+        model_inp = th.concat((states.repeat((K, 1)), inner_actions), dim=1).type(th.float32)
 
-            kls = kl_div(mu_next_ac, sigma_next_ac, mu_next, sigma_next)
-            kls = th.clip(kls, min=0)
-            
-            all_kls[:, j] = kls
+        inner_mu_next, inner_log_std_next = self.world_model(model_inp)
 
-        cai = th.mean(all_kls, dim=1)
+        inner_mu_next = inner_mu_next.view(K, self.batch_size, *self.observation_space.shape).mean(dim=0).repeat((K, 1))
+        inner_log_std_next = inner_log_std_next.view(K, self.batch_size, *self.observation_space.shape).mean(dim=0).repeat((K, 1))
 
+        # print(inner_log_std_next[:, 0])
+        # print(outer_log_std_next[:, 0])
+
+        # print(f"inner_mu_next: {inner_mu_next.shape}")
+        # print(f"outer_mu_next: {outer_mu_next.shape}")
+        # print(f"inner_std_next: {inner_log_std_next.shape}")
+        # print(f"outer_next: {outer_log_std_next.shape}")
+        kls = kl_div(outer_mu_next, outer_log_std_next.exp() ** 2, inner_mu_next, inner_log_std_next.exp() ** 2)
+        kls = th.clip(kls, min=0)
+        kls = kls.view(K, self.batch_size)
+        # print(f"kls: {kls.shape}")
+
+        cai = th.mean(kls, dim=0)
+        # print(cai.shape)
+        # all_kls[:, j] = kls
+
+        # mu_next = mu_next.view(self.batch_size, K, -1).mean(dim=1)
+        # log_std_next = log_std_next.view(self.batch_size, K, -1).mean(dim=1)
+
+        # all_log_std_next[i] = log_std_next.mean()
+        # all_log_std_next_ac[i] = log_std_next_ac.mean()
+        # all_mu_next_ac[i] = mu_next_ac.mean()
+        # all_mu_next[i] = mu_next.mean()
+
+
+        self.logger.record("train/outer_mu_next", outer_mu_next.mean().mean().detach().cpu().numpy())
+        self.logger.record("train/inner_mu_next", inner_mu_next.mean().mean().detach().cpu().numpy())
+        self.logger.record("train/outer_log_std_next", outer_log_std_next.mean().mean().detach().cpu().numpy())
+        self.logger.record("train/inner_log_std_next", inner_log_std_next.mean().mean().detach().cpu().numpy())        
+
+        # print(f"CAI_2 time: {time.time() - st}")
         return cai
 
     def learn(

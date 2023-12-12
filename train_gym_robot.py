@@ -164,7 +164,7 @@ def main():
     
     device = T.device("cuda:0" if T.cuda.is_available() else 'cpu')
     env = gym.make(cfg.env.name, **cfg.env.args)
-    # env = RewWrap(env)
+    env = RewWrap(env)
     env = ObsWrap(env)
     env.reset()
     obs, reward, terminated, truncated, info = env.step(env.action_space.sample())

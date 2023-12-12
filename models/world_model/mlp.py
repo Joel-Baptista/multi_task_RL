@@ -7,6 +7,8 @@ from torch import nn
 
 from models.utils import init_module
 
+LOG_STD_MAX = 2
+LOG_STD_MIN = -20
 
 @gin.configurable(denylist=['inp_dim', 'outp_dim'])
 class MLP(nn.Module):
@@ -71,7 +73,7 @@ class MLP(nn.Module):
 
         self.layers = nn.Sequential(*layers)
         self.mu = nn.Linear(current_dim, outp_dim)
-        self.sigma = nn.Linear(current_dim, outp_dim)
+        self.log_std = nn.Linear(current_dim, outp_dim)
 
         self.init()
 
@@ -102,13 +104,13 @@ class MLP(nn.Module):
         
         # JB's
         mu = self.mu(x)
-        sigma = torch.sigmoid(self.sigma(x))
-        sigma = torch.clamp(sigma, min=self.reparam_noise, max=1) #clamp is faster than sigmoid function
+        log_std = torch.sigmoid(self.log_std(x))
+        log_std = torch.clamp(log_std, min=LOG_STD_MIN, max=LOG_STD_MAX) #clamp is faster than sigmoid function
 
         if self.outp_scaling != 1:
             mu = self.outp_scaling * mu
 
-        return mu, sigma
+        return mu, log_std
 
 
 @gin.configurable(denylist=['inp_dim', 'outp_dim'])
