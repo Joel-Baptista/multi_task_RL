@@ -126,7 +126,7 @@ class SAC(OffPolicyAlgorithm):
         seed: Optional[int] = None,
         device: Union[th.device, str] = "auto",
         _init_setup_model: bool = True,
-        world_model: str = None,
+        world_model: str = "mlp",
     ):
         super().__init__(
             policy,

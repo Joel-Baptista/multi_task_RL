@@ -55,7 +55,6 @@ class RewWrap(RewardWrapper):
 
         # delta_objective = abs(observation['achieved_goal']['microwave'][0] - observation['desired_goal']['microwave'][0])
 
-        reward = 10 * reward
         return observation, self.reward(reward), terminated, truncated, info
 
 
@@ -88,7 +87,7 @@ class RewWrap(RewardWrapper):
 
         # print(self.env.unwrapped.data.qpos[start_idx:end_idx].copy())
 
-        return reward
+        return 10 * reward
 class ObsWrap(ObservationWrapper):
     def __init__(self, env: Env):
         super().__init__(env)

@@ -10,6 +10,7 @@ import yaml
 from colorama import Fore
 import math
 import numpy as np
+import time
 
 # Logs
 import wandb
@@ -63,63 +64,83 @@ class ObsWrap(ObservationWrapper):
         return result
 
 def main():
-   parser = argparse.ArgumentParser(description='Train asl2text models.')
-   parser.add_argument('-en', '--experiment_name', type=str)
-   parser.add_argument('-id', '--identifier', type=str, default='')
+    parser = argparse.ArgumentParser(description='Train asl2text models.')
+    parser.add_argument('-en', '--experiment_name', type=str)
+    parser.add_argument('-id', '--identifier', type=str, default='')
 
-   arglist = [x for x in sys.argv[1:] if not x.startswith('__')]
-   args = vars(parser.parse_args(args=arglist))
+    arglist = [x for x in sys.argv[1:] if not x.startswith('__')]
+    args = vars(parser.parse_args(args=arglist))
 
-   if args["experiment_name"] is None:
-      args["experiment_name"] = "baseline"
-      print(f"{Fore.YELLOW}Missing input 'experiment_name'. Assumed to be 'baseline'{Fore.RESET}")
+    if args["experiment_name"] is None:
+        args["experiment_name"] = "baseline"
+        print(f"{Fore.YELLOW}Missing input 'experiment_name'. Assumed to be 'baseline'{Fore.RESET}")
 
-   experiment_name = args['experiment_name']
-   experiment_path = f'{os.getenv("PHD_MODELS")}/{experiment_name}{args["identifier"]}'    
+    experiment_name = args['experiment_name']
+    experiment_path = f'{os.getenv("PHD_MODELS")}/{experiment_name}{args["identifier"]}'    
 
-   # load train config.
-   PHD_ROOT = os.getenv("PHD_ROOT")
-   sys.path.append(PHD_ROOT)
-   cfg_path = f"{PHD_ROOT}/multi_task_RL/experiments/{experiment_name}/test.yaml"
+    # load train config.
+    PHD_ROOT = os.getenv("PHD_ROOT")
+    sys.path.append(PHD_ROOT)
+    cfg_path = f"{PHD_ROOT}/multi_task_RL/experiments/{experiment_name}/test.yaml"
 
-   with open(cfg_path) as f:
-      cfg = DotDict(yaml.load(f, Loader=yaml.loader.SafeLoader))
+    with open(cfg_path) as f:
+        cfg = DotDict(yaml.load(f, Loader=yaml.loader.SafeLoader))
 
-   if not os.path.exists(experiment_path):
-      raise Exception(f"Results from experiment '{experiment_name}' does not exist in path: {experiment_path}")
+    if not os.path.exists(experiment_path):
+        raise Exception(f"Results from experiment '{experiment_name}' does not exist in path: {experiment_path}")
 
-   # create folder to the results.
-   print(f"Path create: {experiment_path}")
+    # create folder to the results.
+    print(f"Path create: {experiment_path}")
 
-   env = gym.make("FrankaKitchen-v1", render_mode="human",tasks_to_complete=["microwave"])
-   env.metadata['render_fps'] = 30
-   env = ObsWrap(env)
-   env.reset()
-   obs, reward, terminated, truncated, info = env.step(env.action_space.sample())
+    env = gym.make("FrankaKitchen-v1", render_mode="human",tasks_to_complete=["microwave"])
+    env.metadata['render_fps'] = 30
+    env = ObsWrap(env)
+    env.reset()
+    obs, reward, terminated, truncated, info = env.step(env.action_space.sample())
 
-   device = T.device("cuda:0" if T.cuda.is_available() else 'cpu')
-   print(f"device:{device}")
-   print(cfg.algorithm.args)
-   model = PPO.load(f"{experiment_path}/model5.zip", env)
+    device = T.device("cuda:0" if T.cuda.is_available() else 'cpu')
+    print(f"device:{device}")
+    print(cfg.algorithm.args)
 
-   print(model.policy)
 
-   score = 0
-   i = 0
-   for _ in range(2000):
-      action, _state = model.predict(obs, deterministic=True)
+    print(f"device:{device}")
+    print(cfg.algorithm.args)
 
-      observation, reward, terminated, truncated, info = env.step(action)
+    print(cfg.algorithm.module)
+    print(f"Algorithm class: {class_from_str(cfg.algorithm.module, cfg.algorithm.name)}")
+    algorithm_class = class_from_str(cfg.algorithm.module, cfg.algorithm.name)
 
-      score += reward
-      obs = observation
+    print(f"Policy class: {class_from_str(cfg.policy.module, cfg.policy.name)}")
+    policy_class = class_from_str(cfg.policy.module, cfg.policy.name)
 
-      if terminated or truncated:
-         i += 1
-         print(f"episode: {i} with score {score}")
-         score = 0
-         obs, info = env.reset()
-   env.close()
+    # model = algorithm_class(policy_class, env, verbose=1,**cfg.algorithm.args)
+    model = algorithm_class.load(f"{experiment_path}/model.zip", env=env)
+    
+    print(model.policy)
+
+    step = 1/30
+    score = 0
+    i = 0
+    while True:
+        st = time.time()
+        action, _state = model.predict(obs, deterministic=True)
+
+        observation, reward, terminated, truncated, info = env.step(action)
+
+        score += reward
+        obs = observation
+        
+        while True:
+            if time.time() - st >= step: break 
+        
+        if terminated or truncated:
+            i += 1
+            if i >= cfg.num_test: break
+
+            print(f"episode: {i} with score {score}")
+            score = 0
+            obs, info = env.reset()
+    env.close()
 
    
 if __name__ == '__main__':
