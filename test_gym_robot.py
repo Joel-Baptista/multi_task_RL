@@ -32,6 +32,7 @@ class ObsWrap(ObservationWrapper):
         super().__init__(env)
         self.env = env
         dim = 0
+        
         for box in self.flatten_space(env.observation_space):
             dim += box.shape[0]
 
@@ -93,7 +94,7 @@ def main():
     print(f"Path create: {experiment_path}")
 
     env = gym.make("FrankaKitchen-v1", render_mode="human",tasks_to_complete=["microwave"])
-    env.metadata['render_fps'] = 30
+    env.metadata['render_fps'] = 70
     env = ObsWrap(env)
     env.reset()
     obs, reward, terminated, truncated, info = env.step(env.action_space.sample())
@@ -118,7 +119,6 @@ def main():
     
     print(model.policy)
 
-    step = 1/30
     score = 0
     i = 0
     while True:
@@ -129,9 +129,6 @@ def main():
 
         score += reward
         obs = observation
-        
-        while True:
-            if time.time() - st >= step: break 
         
         if terminated or truncated:
             i += 1

@@ -127,7 +127,7 @@ class SAC(OffPolicyAlgorithm):
         seed: Optional[int] = None,
         device: Union[th.device, str] = "auto",
         _init_setup_model: bool = True,
-        world_model: str = "mlp",
+        world_model: dict = None,
     ):
         super().__init__(
             policy,
@@ -169,11 +169,17 @@ class SAC(OffPolicyAlgorithm):
             self._setup_model()
 
         # JB's
-        self.world_model = class_from_str(f"models.world_model.{world_model}", world_model.upper())(
+        # self.world_model = class_from_str(f"{world_model['module']}.{world_model['name']}", world_model['name'].upper())(
+        #     inp_dim = env.action_space.shape[0] + env.observation_space.shape[0], 
+        #     outp_dim = env.observation_space.shape[0], 
+        #     **world_model['args']
+        #     )
+        self.world_model = class_from_str(f"models.world_model.mlp", "mlp".upper())(
             inp_dim = env.action_space.shape[0] + env.observation_space.shape[0], 
             outp_dim = env.observation_space.shape[0], 
             hidden_dims = [4156, 2048, 512, 206]
             )
+
         self.world_model.to(self.device)
         print(self.world_model)
 
@@ -401,7 +407,7 @@ class SAC(OffPolicyAlgorithm):
     def calc_causal_influence(self, states: th.Tensor):
         st = time.time()
         cai = 0
-        K = 64
+        K = 16
 
         # all_kls = th.zeros((self.batch_size, K)).to(self.device)
         # all_mu_next = th.zeros((K,)).to(self.device)

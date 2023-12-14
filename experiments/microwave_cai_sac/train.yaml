@@ -6,12 +6,8 @@ env:
   name: "FrankaKitchen-v1"
   args:
     tasks_to_complete:
-      # - "bottom burner"
-      # - "top burner"
-      # - "light switch"
-      # - "slide cabinet"
       - "microwave"
-      # - "kettle"
+
     terminate_on_tasks_completed: True
     remove_task_when_completed: True
     object_noise_ratio: 0.0005
@@ -22,8 +18,7 @@ env:
         name: "reward_wrap"
         module: "wraps.reward"
     - wrap:
-        # name: "observation_wrap"
-        name: "goal_conditioned_wrap"
+        name: "observation_wrap"
         module: "wraps.observation"
 
 

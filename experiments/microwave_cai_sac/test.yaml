@@ -1,6 +1,5 @@
 project: "Kitchen_MultiTask"
-total_timesteps: 10_000_000
-checkpoints: 20 
+num_test: 10 
 
 env:
   name: "FrankaKitchen-v1"
@@ -12,20 +11,6 @@ env:
       # - "slide cabinet"
       - "microwave"
       # - "kettle"
-    terminate_on_tasks_completed: True
-    remove_task_when_completed: True
-    object_noise_ratio: 0.0005
-    robot_noise_ratio: 0.01
-    max_episode_steps: 280
-  wraps:
-    - wrap:
-        name: "reward_wrap"
-        module: "wraps.reward"
-    - wrap:
-        # name: "observation_wrap"
-        name: "goal_conditioned_wrap"
-        module: "wraps.observation"
-
 
 policy: 
   name: "SACPolicy"
@@ -38,7 +23,7 @@ algorithm:
       learning_rate: 0.0003
       buffer_size: 1_000_000
       learning_starts: 100
-      batch_size: 512
+      batch_size: 1024
       tau: 0.005
       gamma: 0.99
       train_freq: 1
@@ -46,9 +31,4 @@ algorithm:
       action_noise: Null
       seed: Null
       device: "cuda:1"
-      world_model:
-        name: "mlp"
-        module: "models.world_model"
-        args:
-          hidden_dims: [4156, 2048, 512, 206]
-
+      world_model: "mlp"

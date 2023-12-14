@@ -1,7 +1,7 @@
+debug: False
+env: "FrankaKitchen-v1"
 project: "Kitchen_MultiTask"
-total_timesteps: 10_000_000
-checkpoints: 20 
-
+num_test: 10 
 env:
   name: "FrankaKitchen-v1"
   args:
@@ -13,19 +13,6 @@ env:
       # - "slide cabinet"
       - "microwave"
       # - "kettle"
-    terminate_on_tasks_completed: True
-    remove_task_when_completed: True
-    object_noise_ratio: 0.0005
-    robot_noise_ratio: 0.01
-    max_episode_steps: 280
-  wraps:
-    - wrap:
-        name: "reward_wrap"
-        module: "wraps.reward"
-    - wrap:
-        name: "observation_wrap"
-        module: "wraps.observation"
-
 
 policy: 
   name: "MlpPolicy"
@@ -53,3 +40,4 @@ algorithm:
       stats_window_size: 100
       seed: Null
       device: "cuda:1"
+

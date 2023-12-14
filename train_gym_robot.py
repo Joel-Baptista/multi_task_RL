@@ -5,12 +5,9 @@ import argparse
 import os
 import sys
 import shutil
-from typing import Any
+
 import yaml
 from colorama import Fore
-import math
-import numpy as np
-from typing import SupportsFloat, TypeVar
 from tqdm import tqdm
 
 # Logs
@@ -19,8 +16,7 @@ from wandb.integration.sb3 import WandbCallback
 
 # Reinforcement Learning
 import gymnasium as gym
-from gymnasium import error
-from gymnasium import Env, ObservationWrapper, spaces, RewardWrapper
+
 from gymnasium_robotics.envs.franka_kitchen.kitchen_env import KitchenEnv, FrankaRobot
 # from stable_baselines3 import PPO
 from stable_baselines3.sac.policies import SACPolicy
@@ -31,98 +27,15 @@ import torch as T
 from models.testings.PPO_exp import CostumAC
 from models import *
 from utils.common import DotDict, model_class_from_str, class_from_str
+from utils.env import add_wrappers
 
-# Mujoco
-try:
-    import mujoco
-    from mujoco import MjData, MjModel, mjtObj
-except ImportError as e:
-    raise error.DependencyNotInstalled(f"{e}. (HINT: you need to install mujoco")
+# # Mujoco
+# try:
+#     import mujoco
+#     from mujoco import MjData, MjModel, mjtObj
+# except ImportError as e:
+#     raise error.DependencyNotInstalled(f"{e}. (HINT: you need to install mujoco")
 
-ObsType = TypeVar("ObsType")
-ActType = TypeVar("ActType")
-
-class RewWrap(RewardWrapper):
-    def __init__(self, env: Env):
-        super().__init__(env)
-        self.env = env
-
-    def step(
-        self, action: ActType
-    ) -> tuple[ObsType, SupportsFloat, bool, bool, dict[str, Any]]:
-        
-        observation, reward, terminated, truncated, info = self.env.step(action)
-
-        # delta_objective = abs(observation['achieved_goal']['microwave'][0] - observation['desired_goal']['microwave'][0])
-
-        return observation, self.reward(reward), terminated, truncated, info
-
-
-    def reward(self, reward: SupportsFloat) -> SupportsFloat:
-        """Returns a modified environment ``reward``.
-
-        Args:
-            reward: The :attr:`env` :meth:`step` reward
-
-        Returns:
-            The modified `reward`
-        """
-        # print(self.env.unwrapped.model)
-        # print(self.env.unwrapped.data)
-
-        # joint_id = mujoco.mj_name2id(self.env.unwrapped.model, mujoco.mjtObj.mjOBJ_JOINT, "robot:panda0_joint5")
-        # joint_type = self.env.unwrapped.model.jnt_type[joint_id]
-        # joint_addr = self.env.unwrapped.model.jnt_qposadr[joint_id]
-        
-        # if joint_type == mujoco.mjtJoint.mjJNT_FREE:
-        #     ndim = 7
-        # elif joint_type == mujoco.mjtJoint.mjJNT_BALL:
-        #     ndim = 4
-        # else:
-        #     assert joint_type in (mujoco.mjtJoint.mjJNT_HINGE, mujoco.mjtJoint.mjJNT_SLIDE)
-        #     ndim = 1
-
-        # start_idx = joint_addr
-        # end_idx = joint_addr + ndim
-
-        # print(self.env.unwrapped.data.qpos[start_idx:end_idx].copy())
-
-        return 10 * reward
-class ObsWrap(ObservationWrapper):
-    def __init__(self, env: Env):
-        super().__init__(env)
-        self.env = env
-        dim = 0
-        for box in self.flatten_space(env.observation_space):
-            dim += box.shape[0]
-
-        self.observation_space = spaces.Box(
-            low = -math.inf,
-            high = math.inf,
-            shape = (dim,),
-            dtype= np.float64
-        )
-
-    def observation(self, observation: Any) -> Any:
-        return np.array(self.flatten_obs(observation))
-
-    def flatten_space(self, obs):
-        result=[]
-        for key in obs:
-            if isinstance(obs[key], spaces.Dict) or isinstance(obs[key], dict):
-                result.extend(self.flatten_space(obs[key]))
-            else:
-                result.append(obs[key])
-        return result
-
-    def flatten_obs(self, obs):
-        result=[]
-        for key in obs:
-            if isinstance(obs[key], dict):
-                result.extend(self.flatten_obs(obs[key]))
-            else:
-                result.extend(list(obs[key]))
-        return result
 
 def main():
     parser = argparse.ArgumentParser(description='Train asl2text models.')
@@ -163,17 +76,19 @@ def main():
         print(f"Path create: {experiment_path}") 
     
     device = T.device("cuda:0" if T.cuda.is_available() else 'cpu')
+    print(cfg.algorithm.args)
+    print(f"device:{device}")
+
     env = gym.make(cfg.env.name, **cfg.env.args)
-    env = RewWrap(env)
-    env = ObsWrap(env)
+    
+    env = add_wrappers(env, cfg.env.wraps)
+
     env.reset()
     obs, reward, terminated, truncated, info = env.step(env.action_space.sample())
+    
     print(env.observation_space.shape)
     print(env.reward_range)
     
-    print(f"device:{device}")
-    print(cfg.algorithm.args)
-
     print(cfg.algorithm.module)
     print(f"Algorithm class: {class_from_str(cfg.algorithm.module, cfg.algorithm.name)}")
     algorithm_class = class_from_str(cfg.algorithm.module, cfg.algorithm.name)
