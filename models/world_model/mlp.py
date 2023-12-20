@@ -6,9 +6,12 @@ import torch
 from torch import nn
 
 from models.utils import init_module
+import math
+from utils.common import class_from_str
 
 LOG_STD_MAX = 2
 LOG_STD_MIN = -20
+_LOG_2PI = math.log(2 * math.pi)
 
 @gin.configurable(denylist=['inp_dim', 'outp_dim'])
 class MLP(nn.Module):
@@ -18,6 +21,7 @@ class MLP(nn.Module):
                  hidden_dims,
                  lr=0.0001,
                  hidden_activation=nn.ReLU,
+                 dropout=0.0,
                  outp_layer=nn.Linear,
                  outp_activation=nn.Identity,
                  outp_scaling=1.0,
@@ -39,6 +43,7 @@ class MLP(nn.Module):
         self.outp_scaling = outp_scaling
         self.add_bn_input = add_bn_input
         self.reparam_noise = 1e-6 # JB's
+        self.dropout = dropout
         if add_bn_input:
             assert not legacy_bn_first
 
@@ -52,6 +57,10 @@ class MLP(nn.Module):
                 self.input_bn = bn
 
         current_dim = inp_dim + (inp_dim if self.add_bn_input else 0)
+
+        if isinstance(hidden_activation, str):
+            hidden_activation = class_from_str("torch.nn", hidden_activation)
+
         for idx, hidden_dim in enumerate(hidden_dims):
             layers.append(nn.Linear(current_dim,
                                     hidden_dim))
@@ -62,6 +71,7 @@ class MLP(nn.Module):
             elif use_layer_norm:
                 layers.append(nn.LayerNorm(hidden_dim,
                                            elementwise_affine=True))
+            
             layers.append(hidden_activation())
 
             current_dim = hidden_dim
@@ -72,6 +82,7 @@ class MLP(nn.Module):
         #     layers.append(outp_activation())
 
         self.layers = nn.Sequential(*layers)
+        self.drop_layer = nn.Dropout(self.dropout)
         self.mu = nn.Linear(current_dim, outp_dim)
         self.log_std = nn.Linear(current_dim, outp_dim)
 
@@ -99,19 +110,29 @@ class MLP(nn.Module):
 
         x = inp
         for idx, layer in enumerate(self.layers):
-
             x = layer(x)
         
         # JB's
+        x = self.drop_layer(x)
         mu = self.mu(x)
-        log_std = torch.sigmoid(self.log_std(x))
-        log_std = torch.clamp(log_std, min=LOG_STD_MIN, max=LOG_STD_MAX) #clamp is faster than sigmoid function
+        # log_std = torch.sigmoid(self.log_std(x))
+        log_std = self.log_std(x)
+        log_std = torch.clamp(log_std, min=LOG_STD_MIN, max=LOG_STD_MAX) 
 
         if self.outp_scaling != 1:
             mu = self.outp_scaling * mu
 
         return mu, log_std
 
+    def calc_loss(self, obs_next_mu, obs_next_logstd, obs_next_target):
+        # print("------------------------------------------------------------")
+        # print(f"((obs_next_target - obs_next_mu) ** 2).mean(): {((obs_next_target - obs_next_mu) ** 2).mean()}")
+        # print(f"((-obs_next_logstd).exp()).mean(): {((-obs_next_logstd).exp()).mean()}")
+        # print(f"obs_next_logstd: {obs_next_logstd.mean()}")
+        # print(f"(((obs_next_target - obs_next_mu) ** 2) * (-obs_next_logstd).exp()).mean(): {(((obs_next_target - obs_next_mu) ** 2) * (-obs_next_logstd).exp()).mean()}")
+        model_loss = -0.5 * (((obs_next_target - obs_next_mu) ** 2) * (-obs_next_logstd).exp() + obs_next_logstd + _LOG_2PI)
+
+        return -model_loss.mean()
 
 @gin.configurable(denylist=['inp_dim', 'outp_dim'])
 class FactorizedMLP(MLP):

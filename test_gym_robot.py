@@ -115,7 +115,8 @@ def main():
     policy_class = class_from_str(cfg.policy.module, cfg.policy.name)
 
     # model = algorithm_class(policy_class, env, verbose=1,**cfg.algorithm.args)
-    model = algorithm_class.load(f"{experiment_path}/model.zip", env=env)
+    model = algorithm_class(policy_class, env, verbose=1,**cfg.algorithm.args)
+    model = model.load(experiment_path)
     
     print(model.policy)
 

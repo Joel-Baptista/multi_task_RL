@@ -16,7 +16,6 @@ class REWARD_WRAP(RewardWrapper):
     ) -> tuple[ObsType, SupportsFloat, bool, bool, dict[str, Any]]:
         
         observation, reward, terminated, truncated, info = self.env.step(action)
-        print(observation)
 
         # delta_objective = abs(observation['achieved_goal']['microwave'][0] - observation['desired_goal']['microwave'][0])
 

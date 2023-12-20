@@ -17,14 +17,15 @@ from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.noise import ActionNoise, VectorizedActionNoise
 
 # JB's
-from utils.common import DotDict, model_class_from_str, class_from_str
+from utils.common import class_from_str
 import math
 from influence_estimation.kl_torch import kl_div
 import time
+import os
 
 SelfSAC = TypeVar("SelfSAC", bound="SAC")
 _LOG_2PI = math.log(2 * math.pi)
-
+MODELS = os.getenv("PHD_MODELS")
 
 
 class SAC(OffPolicyAlgorithm):
@@ -107,6 +108,10 @@ class SAC(OffPolicyAlgorithm):
         learning_starts: int = 100,
         batch_size: int = 256,
         tau: float = 0.005,
+        K: int = 16,
+        world_steps_to_train: int= 1_000, #-1 to not train
+        world_num_updates: int = 10,
+        world_batch_size: int = 512,
         gamma: float = 0.99,
         train_freq: Union[int, Tuple[int, str]] = 1,
         gradient_steps: int = 1,
@@ -156,29 +161,39 @@ class SAC(OffPolicyAlgorithm):
             supported_action_spaces=(spaces.Box,),
             support_multi_env=True,
         )
-
         self.target_entropy = target_entropy
         self.log_ent_coef = None  # type: Optional[th.Tensor]
         # Entropy coefficient / Entropy temperature
         # Inverse of the reward scale
         self.ent_coef = ent_coef
+        self.K = K
         self.target_update_interval = target_update_interval
         self.ent_coef_optimizer: Optional[th.optim.Adam] = None
+        self.world_steps_to_train = world_steps_to_train 
+        self.world_num_updates = world_num_updates
+        self.world_batch_size = world_batch_size
 
         if _init_setup_model:
             self._setup_model()
 
         # JB's
-        # self.world_model = class_from_str(f"{world_model['module']}.{world_model['name']}", world_model['name'].upper())(
-        #     inp_dim = env.action_space.shape[0] + env.observation_space.shape[0], 
-        #     outp_dim = env.observation_space.shape[0], 
-        #     **world_model['args']
-        #     )
-        self.world_model = class_from_str(f"models.world_model.mlp", "mlp".upper())(
+        # aux = class_from_str(f"{world_model['module']}.{world_model['name']}", world_model['name'].upper())
+        # print(aux)
+        self.world_model = class_from_str(f"{world_model['module']}.{world_model['name']}", world_model['name'].upper())(
             inp_dim = env.action_space.shape[0] + env.observation_space.shape[0], 
             outp_dim = env.observation_space.shape[0], 
-            hidden_dims = [4156, 2048, 512, 206]
+            **world_model['args']
             )
+        if world_model["pretrained"]:
+            self.world_model.load_state_dict(
+                th.load(f"{MODELS}/{world_model['path']}/world_model.pt",
+                                                      map_location=self.device))
+        
+        # self.world_model = class_from_str(f"models.world_model.mlp", "mlp".upper())(
+        #     inp_dim = env.action_space.shape[0] + env.observation_space.shape[0], 
+        #     outp_dim = env.observation_space.shape[0], 
+        #     hidden_dims = [4156, 2048, 512, 206]
+        #     )
 
         self.world_model.to(self.device)
         print(self.world_model)
@@ -241,18 +256,23 @@ class SAC(OffPolicyAlgorithm):
             # Sample replay buffer
             replay_data = self.replay_buffer.sample(batch_size, env=self._vec_normalize_env)  # type: ignore[union-attr]
 
-            model_inp = th.concat((replay_data.observations, replay_data.actions), dim=1).type(th.float32)
+            if self._n_updates + gradient_step % self.world_steps_to_train == 0 \
+                and self.world_steps_to_train > 0:
+                
+                for _ in range(0, self.world_num_updates):
+                    world_data = self.replay_buffer.sample(self.world_batch_size, env=self._vec_normalize_env)
 
-            mu_next, log_std_next = self.world_model(model_inp)
+                    model_inp = th.concat((world_data.observations, world_data.actions), dim=1).type(th.float32)
 
-            model_loss = 0.5 * (((replay_data.next_observations.type(th.float32) - mu_next) ** 2) * (-log_std_next).exp() + log_std_next + _LOG_2PI)
-            model_loss = model_loss.mean()
+                    mu_next, log_std_next = self.world_model(model_inp)
 
-            self.world_model.optim.zero_grad()
-            model_loss.backward()
-            self.world_model.optim.step()
+                    model_loss = self.world_model.calc_loss(mu_next, log_std_next, world_data.next_observations.type(th.float32))
 
-            world_model_losses.append(model_loss.item())
+                    self.world_model.optim.zero_grad()
+                    model_loss.backward()
+                    self.world_model.optim.step()
+
+                    world_model_losses.append(model_loss.item())
 
             # We need to sample because `log_std` may have changed between two gradient steps
             if self.use_sde:
@@ -341,10 +361,11 @@ class SAC(OffPolicyAlgorithm):
         self.logger.record("train/ent_coef", np.mean(ent_coefs))
         self.logger.record("train/actor_loss", np.mean(actor_losses))
         self.logger.record("train/critic_loss", np.mean(critic_losses))
-        self.logger.record("train/world_model_loss", np.mean(world_model_losses))
         self.logger.record("train/cai", np.mean(
             cai.squeeze(1).detach().cpu().numpy()
             ))
+        if len(world_model_losses) > 0:
+            self.logger.record("train/world_model_loss", np.mean(world_model_losses))
         if len(ent_coef_losses) > 0:
             self.logger.record("train/ent_coef_loss", np.mean(ent_coef_losses))
 
@@ -407,7 +428,6 @@ class SAC(OffPolicyAlgorithm):
     def calc_causal_influence(self, states: th.Tensor):
         st = time.time()
         cai = 0
-        K = 16
 
         # all_kls = th.zeros((self.batch_size, K)).to(self.device)
         # all_mu_next = th.zeros((K,)).to(self.device)
@@ -420,35 +440,35 @@ class SAC(OffPolicyAlgorithm):
 
         # print(f"mu_mean: {mu_mean.shape}")
 
-        outer_actions = th.zeros((K, self.batch_size, *self.action_space.shape)).to(self.device)
-        outer_states = th.zeros((K, self.batch_size, *self.observation_space.shape)).to(self.device)
+        outer_actions = th.zeros((self.K, self.batch_size, *self.action_space.shape)).to(self.device)
+        outer_states = th.zeros((self.K, self.batch_size, *self.observation_space.shape)).to(self.device)
 
-        for j in range(0, K):
+        for j in range(0, self.K):
             actions = self.actor.action_dist.actions_from_params(mu_mean, log_std, deterministic=False, **{})
             outer_actions[j] = actions
             outer_states[j] = states
         
-        outer_states = outer_states.view(K * self.batch_size, *self.observation_space.shape)
-        outer_actions = outer_actions.view(K * self.batch_size, *self.action_space.shape)
+        outer_states = outer_states.view(self.K * self.batch_size, *self.observation_space.shape)
+        outer_actions = outer_actions.view(self.K * self.batch_size, *self.action_space.shape)
 
         model_inp = th.concat((outer_states, outer_actions), dim=1).type(th.float32)
         outer_mu_next, outer_log_std_next = self.world_model(model_inp)
 
         # Get transition distribution with action averaged out
-        inner_actions = th.zeros((K, self.batch_size, *self.action_space.shape)).to(self.device)
-        for i in range(0, K):
+        inner_actions = th.zeros((self.K, self.batch_size, *self.action_space.shape)).to(self.device)
+        for i in range(0, self.K):
             actions = self.actor.action_dist.actions_from_params(mu_mean, log_std, deterministic=False, **{})
             inner_actions[i] = actions
 
         # outer_states = outer_states.view(K * self.batch_size, *self.observation_space.shape)
-        inner_actions = inner_actions.view(K * self.batch_size, *self.action_space.shape)
+        inner_actions = inner_actions.view(self.K * self.batch_size, *self.action_space.shape)
 
-        model_inp = th.concat((states.repeat((K, 1)), inner_actions), dim=1).type(th.float32)
+        model_inp = th.concat((states.repeat((self.K, 1)), inner_actions), dim=1).type(th.float32)
 
         inner_mu_next, inner_log_std_next = self.world_model(model_inp)
 
-        inner_mu_next = inner_mu_next.view(K, self.batch_size, *self.observation_space.shape).mean(dim=0).repeat((K, 1))
-        inner_log_std_next = inner_log_std_next.view(K, self.batch_size, *self.observation_space.shape).mean(dim=0).repeat((K, 1))
+        inner_mu_next = inner_mu_next.view(self.K, self.batch_size, *self.observation_space.shape).mean(dim=0).repeat((self.K, 1))
+        inner_log_std_next = inner_log_std_next.view(self.K, self.batch_size, *self.observation_space.shape).mean(dim=0).repeat((self.K, 1))
 
         # print(inner_log_std_next[:, 0])
         # print(outer_log_std_next[:, 0])
@@ -459,7 +479,7 @@ class SAC(OffPolicyAlgorithm):
         # print(f"outer_next: {outer_log_std_next.shape}")
         kls = kl_div(outer_mu_next, outer_log_std_next.exp() ** 2, inner_mu_next, inner_log_std_next.exp() ** 2)
         kls = th.clip(kls, min=0)
-        kls = kls.view(K, self.batch_size)
+        kls = kls.view(self.K, self.batch_size)
         # print(f"kls: {kls.shape}")
 
         cai = th.mean(kls, dim=0)
@@ -473,133 +493,48 @@ class SAC(OffPolicyAlgorithm):
         # all_log_std_next_ac[i] = log_std_next_ac.mean()
         # all_mu_next_ac[i] = mu_next_ac.mean()
         # all_mu_next[i] = mu_next.mean()
-
+        # print(cai)
 
         self.logger.record("train/outer_mu_next", outer_mu_next.mean().mean().detach().cpu().numpy())
         self.logger.record("train/inner_mu_next", inner_mu_next.mean().mean().detach().cpu().numpy())
         self.logger.record("train/outer_log_std_next", outer_log_std_next.mean().mean().detach().cpu().numpy())
-        self.logger.record("train/inner_log_std_next", inner_log_std_next.mean().mean().detach().cpu().numpy())        
+        self.logger.record("train/inner_log_std_next", inner_log_std_next.mean().mean().detach().cpu().numpy())
+        self.logger.record("train/cai_min", cai.min().detach().cpu().numpy())        
+        self.logger.record("train/cai_max", cai.max().detach().cpu().numpy())        
 
         # print(f"CAI_2 time: {time.time() - st}")
         return cai
 
-    def learn(
-        self: SelfSAC,
-        total_timesteps: int,
-        callback: MaybeCallback = None,
-        log_interval: int = 4,
-        tb_log_name: str = "SAC",
-        reset_num_timesteps: bool = True,
-        progress_bar: bool = False,
-    ) -> SelfSAC:
-        return super().learn(
-            total_timesteps=total_timesteps,
-            callback=callback,
-            log_interval=log_interval,
-            tb_log_name=tb_log_name,
-            reset_num_timesteps=reset_num_timesteps,
-            progress_bar=progress_bar,
-        )
-    
-    # def collect_rollouts(
-    #     self,
-    #     env: VecEnv,
-    #     callback: BaseCallback,
-    #     train_freq: TrainFreq,
-    #     replay_buffer: ReplayBuffer,
-    #     action_noise: Optional[ActionNoise] = None,
-    #     learning_starts: int = 0,
-    #     log_interval: Optional[int] = None,
-    # ) -> RolloutReturn:
-    #     """
-    #     Collect experiences and store them into a ``ReplayBuffer``.
+    # def learn(
+    #     self: SelfSAC,
+    #     total_timesteps: int,
+    #     callback: MaybeCallback = None,
+    #     log_interval: int = 4,
+    #     tb_log_name: str = "SAC",
+    #     reset_num_timesteps: bool = True,
+    #     progress_bar: bool = False,
+    # ) -> SelfSAC:
+    #     return super().learn(
+    #         total_timesteps=total_timesteps,
+    #         callback=callback,
+    #         log_interval=log_interval,
+    #         tb_log_name=tb_log_name,
+    #         reset_num_timesteps=reset_num_timesteps,
+    #         progress_bar=progress_bar,
+    #     )
+    def save(self, path) -> None:
+        
+        th.save(self.world_model.state_dict(), f"{path}/world_model.pt")
+        th.save(self.actor.state_dict(), f"{path}/actor.pt")
+        th.save(self.critic.state_dict(), f"{path}/critic.pt")
+        th.save(self.critic_target.state_dict(), f"{path}/critic_target.pt")
 
-    #     :param env: The training environment
-    #     :param callback: Callback that will be called at each step
-    #         (and at the beginning and end of the rollout)
-    #     :param train_freq: How much experience to collect
-    #         by doing rollouts of current policy.
-    #         Either ``TrainFreq(<n>, TrainFrequencyUnit.STEP)``
-    #         or ``TrainFreq(<n>, TrainFrequencyUnit.EPISODE)``
-    #         with ``<n>`` being an integer greater than 0.
-    #     :param action_noise: Action noise that will be used for exploration
-    #         Required for deterministic policy (e.g. TD3). This can also be used
-    #         in addition to the stochastic policy for SAC.
-    #     :param learning_starts: Number of steps before learning for the warm-up phase.
-    #     :param replay_buffer:
-    #     :param log_interval: Log data every ``log_interval`` episodes
-    #     :return:
-    #     """
-    #     # Switch to eval mode (this affects batch norm / dropout)
-    #     self.policy.set_training_mode(False)
-
-    #     num_collected_steps, num_collected_episodes = 0, 0
-
-    #     assert isinstance(env, VecEnv), "You must pass a VecEnv"
-    #     assert train_freq.frequency > 0, "Should at least collect one step or episode."
-
-    #     if env.num_envs > 1:
-    #         assert train_freq.unit == TrainFrequencyUnit.STEP, "You must use only one env when doing episodic training."
-
-    #     # Vectorize action noise if needed
-    #     if action_noise is not None and env.num_envs > 1 and not isinstance(action_noise, VectorizedActionNoise):
-    #         action_noise = VectorizedActionNoise(action_noise, env.num_envs)
-
-    #     if self.use_sde:
-    #         self.actor.reset_noise(env.num_envs)
-
-    #     callback.on_rollout_start()
-    #     continue_training = True
-    #     while should_collect_more_steps(train_freq, num_collected_steps, num_collected_episodes):
-    #         if self.use_sde and self.sde_sample_freq > 0 and num_collected_steps % self.sde_sample_freq == 0:
-    #             # Sample a new noise matrix
-    #             self.actor.reset_noise(env.num_envs)
-
-    #         # Select action randomly or according to policy
-    #         actions, buffer_actions = self._sample_action(learning_starts, action_noise, env.num_envs)
-
-    #         # Rescale and perform action
-    #         new_obs, rewards, dones, infos = env.step(actions)
-
-    #         self.num_timesteps += env.num_envs
-    #         num_collected_steps += 1
-
-    #         # Give access to local variables
-    #         callback.update_locals(locals())
-    #         # Only stop training if return value is False, not when it is None.
-    #         if callback.on_step() is False:
-    #             return RolloutReturn(num_collected_steps * env.num_envs, num_collected_episodes, continue_training=False)
-
-    #         # Retrieve reward and episode length if using Monitor wrapper
-    #         self._update_info_buffer(infos, dones)
-
-    #         # Store data in replay buffer (normalized action and unnormalized observation)
-    #         self._store_transition(replay_buffer, buffer_actions, new_obs, rewards, dones, infos)
-
-    #         self._update_current_progress_remaining(self.num_timesteps, self._total_timesteps)
-
-    #         # For DQN, check if the target network should be updated
-    #         # and update the exploration schedule
-    #         # For SAC/TD3, the update is dones as the same time as the gradient update
-    #         # see https://github.com/hill-a/stable-baselines/issues/900
-    #         self._on_step()
-
-    #         for idx, done in enumerate(dones):
-    #             if done:
-    #                 # Update stats
-    #                 num_collected_episodes += 1
-    #                 self._episode_num += 1
-
-    #                 if action_noise is not None:
-    #                     kwargs = dict(indices=[idx]) if env.num_envs > 1 else {}
-    #                     action_noise.reset(**kwargs)
-
-    #                 # Log training infos
-    #                 if log_interval is not None and self._episode_num % log_interval == 0:
-    #                     self._dump_logs()
-    #     callback.on_rollout_end()
-
-    #     return RolloutReturn(num_collected_steps * env.num_envs, num_collected_episodes, continue_training)
+    def load(self, path):
+        
+        self.world_model.load_state_dict(th.load(f"{path}/world_model.pt", map_location=self.device))
+        self.actor.load_state_dict(th.load(f"{path}/actor.pt", map_location=self.device))
+        self.critic.load_state_dict(th.load(f"{path}/critic.pt", map_location=self.device))
+        self.critic_target.load_state_dict(th.load(f"{path}/critic_target.pt", map_location=self.device))
 
 
     def _excluded_save_params(self) -> List[str]:

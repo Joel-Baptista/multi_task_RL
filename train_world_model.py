@@ -1,20 +1,39 @@
 import minari
 import torch
+import torch.nn as nn
+
 # from utils.dataloader import collate_fn
 from gymnasium import spaces
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader, random_split, ConcatDataset, Dataset
 import numpy as np
 import time
 from tqdm import tqdm
 import math
+import wandb
+import os
+import shutil
 
 from utils.common import DotDict, model_class_from_str, class_from_str
 from wraps.observation.observation_wrap import OBSERVATION_WRAP
 
 TASKS = ['microwave']
-DATASET = "kitchen-mixed-v1"
+DATASETS = ["kitchen-complete-v1", "kitchen-mixed-v1", "kitchen-partial-v1"]
+DEGUB = False
+experiment_path = f'{os.getenv("PHD_MODELS")}/world_model'  
+args = {
+    "epochs": 1000,
+    "hidden_dims": [4048, 2012, 512, 206],
+    "hidden_activation": "ReLU",
+    "dropout": 0.0,
+}
+
+if os.path.exists(experiment_path):
+    shutil.rmtree(experiment_path)
+    print(f'Removing original {experiment_path}')
+os.makedirs(experiment_path)
 
 _LOG_2PI = math.log(2 * math.pi)
+# _LOG_2PI = 0
 
 
 def flatten_space(obs):
@@ -141,20 +160,39 @@ def collate_fn(batch):
     
     return states_actions_shuffled,  states_next_shuffled
 
+if not DEGUB:
+    wandb.login()
+    run = wandb.init(
+        # Set the project where this run will be logged
+        project="Kitchen_World_Model",
+        name="world_model",
+        # Track hyperparameters and run metadata
+        config=args,
+    )
 
-try:
-    dataset = minari.load_dataset(DATASET)
-except:
-    dataset = minari.load_dataset(DATASET, download=True)
+full_dataset = None
+for dataset_name in DATASETS:
+    try:
+        dataset = minari.load_dataset(dataset_name)
+    except:
+        dataset = minari.load_dataset(dataset_name, download=True)
+
+    if full_dataset is None:
+        full_dataset = dataset
+    else:
+        full_dataset = ConcatDataset([full_dataset, dataset])
 
 
-train_idx = int(0.7 * len(dataset))
-val_idx = len(dataset) - train_idx
+print(len(full_dataset))
+train_idx = int(0.7 * len(full_dataset))
+val_idx = len(full_dataset) - train_idx
 
-train_dataset, val_dataset = random_split(dataset, [train_idx, val_idx])
+print(train_idx)
+print(val_idx)
+train_dataset, val_dataset = random_split(full_dataset, [train_idx, val_idx])
 
-train_loader = DataLoader(train_dataset, batch_size=2, num_workers=3,shuffle=True, collate_fn=collate_fn)
-val_loader = DataLoader(val_dataset, batch_size=2, num_workers=3, collate_fn=collate_fn)
+train_loader = DataLoader(train_dataset, batch_size=4, num_workers=3,shuffle=True, collate_fn=collate_fn)
+val_loader = DataLoader(val_dataset, batch_size=4, num_workers=3, collate_fn=collate_fn)
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else 'cpu')
 
@@ -164,7 +202,9 @@ env = OBSERVATION_WRAP(env)
 world_model = class_from_str(f"models.world_model.mlp", "mlp".upper())(
         inp_dim = env.action_space.shape[0] + env.observation_space.shape[0], 
         outp_dim = env.observation_space.shape[0], 
-        hidden_dims = [4156, 2048, 512, 206]
+        hidden_dims = args["hidden_dims"],
+        hidden_activation = class_from_str("torch.nn", args["hidden_activation"]),
+        dropout = args["dropout"]
         )
 world_model.to(device)
 print(world_model)
@@ -172,10 +212,13 @@ del env
 
 st = time.time()
 
-world_model_losses = []
-world_model_val_losses = []
+min_val_loss = np.inf
 
-for epch in range(0, 100):
+for epoch in range(0, args["epochs"]):
+    print(f"Epoch {epoch + 1}")
+    world_model_losses = []
+    world_model_val_losses = []
+
     world_model.train()
     for batch in tqdm(train_loader):
         states_actions = torch.as_tensor(batch[0], dtype=torch.float32, device=device)
@@ -183,9 +226,7 @@ for epch in range(0, 100):
 
         mu_state_next, log_std_state_next = world_model(states_actions)
 
-        model_loss = 0.5 * (((states_next - mu_state_next) ** 2) * (-log_std_state_next).exp() + 
-                            log_std_state_next + _LOG_2PI)
-        model_loss = model_loss.mean()
+        model_loss = world_model.calc_loss(mu_state_next, log_std_state_next, states_next)
 
         world_model.optim.zero_grad()
         model_loss.backward()
@@ -193,6 +234,8 @@ for epch in range(0, 100):
 
         world_model_losses.append(model_loss.item())
 
+    log_std_list = []
+    mu_list = []
     world_model.eval()
     for batch in tqdm(val_loader):
         states_actions = torch.as_tensor(batch[0], dtype=torch.float32, device=device)
@@ -201,13 +244,28 @@ for epch in range(0, 100):
         with torch.no_grad():
             mu_state_next, log_std_state_next = world_model(states_actions)
 
-            model_loss = 0.5 * (((states_next - mu_state_next) ** 2) * (-log_std_state_next).exp() + 
-                                log_std_state_next + _LOG_2PI)
-            model_loss = model_loss.mean()
+            model_loss = world_model.calc_loss(mu_state_next, log_std_state_next, states_next)
 
-        world_model_val_losses.append(model_loss.item())
+            world_model_val_losses.append(model_loss.item())
+            log_std_list.append(log_std_state_next.mean().item())
+            mu_list.append(mu_state_next.mean().item())
 
-    print(f"Avg loss: {np.array(world_model_losses).mean()}")
-    print(f"Avg val loss: {np.array(world_model_val_losses).mean()}")
+    mean_loss = np.array(world_model_losses).mean()
+    mean_val_loss = np.array(world_model_val_losses).mean()
+
+    print(f"Avg loss: {mean_loss}")
+    print(f"Avg val loss: {mean_val_loss}")
+    wandb.log({"train/avg_loss": mean_loss,
+              "train/avg_val_loss": mean_val_loss,
+              "train/log_std_mean":  np.array(log_std_list).mean(),
+              "train/mu_mean":  np.array(mu_list).mean(),
+              })
+    
+    if mean_val_loss < min_val_loss:
+        min_val_loss = mean_val_loss
+        torch.save(world_model.state_dict(), f"{experiment_path}/world_model.pt")
+        print("-------------------------Saved Model-------------------------------")
+
+
 
 print(time.time() - st)
