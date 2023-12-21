@@ -104,11 +104,12 @@ def main():
             name=f"{cfg.algorithm.name}_{experiment_name}"
             )
 
-        model = algorithm_class(policy_class, env, verbose=1, tensorboard_log=f"{experiment_path}/{run.id}",**cfg.algorithm.args)
+        model = algorithm_class(policy_class, env, verbose=2, tensorboard_log=f"{experiment_path}/{run.id}",**cfg.algorithm.args)
     
         print(model.policy)
         model.learn(
             total_timesteps=cfg.total_timesteps,
+            log_interval=1,
             callback=WandbCallback(
                 verbose=2,
                 model_save_path=experiment_path,

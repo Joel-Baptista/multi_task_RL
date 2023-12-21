@@ -191,8 +191,8 @@ print(train_idx)
 print(val_idx)
 train_dataset, val_dataset = random_split(full_dataset, [train_idx, val_idx])
 
-train_loader = DataLoader(train_dataset, batch_size=4, num_workers=3,shuffle=True, collate_fn=collate_fn)
-val_loader = DataLoader(val_dataset, batch_size=4, num_workers=3, collate_fn=collate_fn)
+train_loader = DataLoader(train_dataset, batch_size=6, num_workers=3,shuffle=True, collate_fn=collate_fn)
+val_loader = DataLoader(val_dataset, batch_size=6, num_workers=3, collate_fn=collate_fn)
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else 'cpu')
 

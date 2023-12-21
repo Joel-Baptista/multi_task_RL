@@ -184,6 +184,7 @@ class SAC(OffPolicyAlgorithm):
             outp_dim = env.observation_space.shape[0], 
             **world_model['args']
             )
+        # print(f"For Entropy: {float(-np.prod(self.env.action_space.shape).astype(np.float32))}")
         if world_model["pretrained"]:
             self.world_model.load_state_dict(
                 th.load(f"{MODELS}/{world_model['path']}/world_model.pt",
@@ -255,10 +256,9 @@ class SAC(OffPolicyAlgorithm):
         for gradient_step in range(gradient_steps):
             # Sample replay buffer
             replay_data = self.replay_buffer.sample(batch_size, env=self._vec_normalize_env)  # type: ignore[union-attr]
-
-            if self._n_updates + gradient_step % self.world_steps_to_train == 0 \
+            if (self._n_updates + gradient_step) % self.world_steps_to_train == 0 \
                 and self.world_steps_to_train > 0:
-                
+                print("Training world model!!!!")
                 for _ in range(0, self.world_num_updates):
                     world_data = self.replay_buffer.sample(self.world_batch_size, env=self._vec_normalize_env)
 
@@ -312,9 +312,10 @@ class SAC(OffPolicyAlgorithm):
                 next_q_values = next_q_values - ent_coef * next_log_prob.reshape(-1, 1)
                 # td error + entropy term
 
-                cai = self.calc_causal_influence(replay_data.observations).unsqueeze(1)
+                cai, info = self.calc_causal_influence(replay_data.observations)
+                cai = cai.unsqueeze(1)
                 # cai2 = self.calc_causal_influence_2(replay_data.observations).unsqueeze(1)
-
+                # cai =  cai * 10 ** (-6)
                 # print(f"cai: {cai.mean()}")
                 # print(f"cai2: {cai2.mean()}")
 
@@ -361,11 +362,20 @@ class SAC(OffPolicyAlgorithm):
         self.logger.record("train/ent_coef", np.mean(ent_coefs))
         self.logger.record("train/actor_loss", np.mean(actor_losses))
         self.logger.record("train/critic_loss", np.mean(critic_losses))
-        self.logger.record("train/cai", np.mean(
+        self.logger.record("cai/cai", np.mean(
             cai.squeeze(1).detach().cpu().numpy()
             ))
+        self.logger.record("cai/cai_min", np.mean(
+            cai.squeeze(1).min().detach().cpu().numpy()
+            ))
+        self.logger.record("cai/cai_max", np.mean(
+            cai.squeeze(1).max().detach().cpu().numpy()
+            ))
+        for log in info:
+            self.logger.record(f"cai/{log}", np.mean(info[log]))
+            
         if len(world_model_losses) > 0:
-            self.logger.record("train/world_model_loss", np.mean(world_model_losses))
+            self.logger.record("world_model/world_model_loss", np.mean(world_model_losses))
         if len(ent_coef_losses) > 0:
             self.logger.record("train/ent_coef_loss", np.mean(ent_coef_losses))
 
@@ -452,7 +462,7 @@ class SAC(OffPolicyAlgorithm):
         outer_actions = outer_actions.view(self.K * self.batch_size, *self.action_space.shape)
 
         model_inp = th.concat((outer_states, outer_actions), dim=1).type(th.float32)
-        outer_mu_next, outer_log_std_next = self.world_model(model_inp)
+        outer_mu_next, outer_logvar_next = self.world_model(model_inp)
 
         # Get transition distribution with action averaged out
         inner_actions = th.zeros((self.K, self.batch_size, *self.action_space.shape)).to(self.device)
@@ -465,10 +475,10 @@ class SAC(OffPolicyAlgorithm):
 
         model_inp = th.concat((states.repeat((self.K, 1)), inner_actions), dim=1).type(th.float32)
 
-        inner_mu_next, inner_log_std_next = self.world_model(model_inp)
+        inner_mu_next, inner_logvar_next = self.world_model(model_inp)
 
         inner_mu_next = inner_mu_next.view(self.K, self.batch_size, *self.observation_space.shape).mean(dim=0).repeat((self.K, 1))
-        inner_log_std_next = inner_log_std_next.view(self.K, self.batch_size, *self.observation_space.shape).mean(dim=0).repeat((self.K, 1))
+        inner_logvar_next = inner_logvar_next.view(self.K, self.batch_size, *self.observation_space.shape).mean(dim=0).repeat((self.K, 1))
 
         # print(inner_log_std_next[:, 0])
         # print(outer_log_std_next[:, 0])
@@ -477,7 +487,7 @@ class SAC(OffPolicyAlgorithm):
         # print(f"outer_mu_next: {outer_mu_next.shape}")
         # print(f"inner_std_next: {inner_log_std_next.shape}")
         # print(f"outer_next: {outer_log_std_next.shape}")
-        kls = kl_div(outer_mu_next, outer_log_std_next.exp() ** 2, inner_mu_next, inner_log_std_next.exp() ** 2)
+        kls = kl_div(outer_mu_next, outer_logvar_next.exp(), inner_mu_next, inner_logvar_next.exp())
         kls = th.clip(kls, min=0)
         kls = kls.view(self.K, self.batch_size)
         # print(f"kls: {kls.shape}")
@@ -495,15 +505,22 @@ class SAC(OffPolicyAlgorithm):
         # all_mu_next[i] = mu_next.mean()
         # print(cai)
 
-        self.logger.record("train/outer_mu_next", outer_mu_next.mean().mean().detach().cpu().numpy())
-        self.logger.record("train/inner_mu_next", inner_mu_next.mean().mean().detach().cpu().numpy())
-        self.logger.record("train/outer_log_std_next", outer_log_std_next.mean().mean().detach().cpu().numpy())
-        self.logger.record("train/inner_log_std_next", inner_log_std_next.mean().mean().detach().cpu().numpy())
-        self.logger.record("train/cai_min", cai.min().detach().cpu().numpy())        
-        self.logger.record("train/cai_max", cai.max().detach().cpu().numpy())        
+        # self.logger.record("train/outer_mu_next", outer_mu_next.mean().mean().detach().cpu().numpy())
+        # self.logger.record("train/inner_mu_next", inner_mu_next.mean().mean().detach().cpu().numpy())
+        # self.logger.record("train/outer_log_std_next", outer_logvar_next.mean().mean().detach().cpu().numpy())
+        # self.logger.record("train/inner_log_std_next", inner_logvar_next.mean().mean().detach().cpu().numpy())
+        # self.logger.record("train/cai_min", cai.min().detach().cpu().numpy())        
+        # self.logger.record("train/cai_max", cai.max().detach().cpu().numpy())        
+
+        info = { 
+            "outer_mu_next": outer_mu_next.mean().mean().detach().cpu().numpy(),
+            "inner_mu_next": inner_mu_next.mean().mean().detach().cpu().numpy(),
+            "outer_log_std_next": outer_logvar_next.mean().mean().detach().cpu().numpy(),
+            "inner_log_std_next": inner_logvar_next.mean().mean().detach().cpu().numpy(),
+        }
 
         # print(f"CAI_2 time: {time.time() - st}")
-        return cai
+        return cai, info
 
     # def learn(
     #     self: SelfSAC,

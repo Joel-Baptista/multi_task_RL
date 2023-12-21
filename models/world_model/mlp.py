@@ -9,8 +9,8 @@ from models.utils import init_module
 import math
 from utils.common import class_from_str
 
-LOG_STD_MAX = 2
-LOG_STD_MIN = -20
+LOG_STD_MAX = 4
+LOG_STD_MIN = -18
 _LOG_2PI = math.log(2 * math.pi)
 
 @gin.configurable(denylist=['inp_dim', 'outp_dim'])
@@ -130,6 +130,21 @@ class MLP(nn.Module):
         # print(f"((-obs_next_logstd).exp()).mean(): {((-obs_next_logstd).exp()).mean()}")
         # print(f"obs_next_logstd: {obs_next_logstd.mean()}")
         # print(f"(((obs_next_target - obs_next_mu) ** 2) * (-obs_next_logstd).exp()).mean(): {(((obs_next_target - obs_next_mu) ** 2) * (-obs_next_logstd).exp()).mean()}")
+        
+        # a = ((obs_next_target - obs_next_mu) ** 2)[0]
+        # b = ((-obs_next_logstd).exp())[0]
+        # c = obs_next_logstd[0]
+
+        # d = a * b
+
+        # l = 0.5 * (d + c + _LOG_2PI)
+        # print("------------------------------------------------------------")
+        # print(f"((obs_next_target - obs_next_mu) ** 2).mean(): {a}")
+        # print(f"((-obs_next_logstd).exp()).mean(): {b}")
+        # print(f"obs_next_logstd: {c}")
+        # print(f"(((obs_next_target - obs_next_mu) ** 2) * (-obs_next_logstd).exp()).mean(): {d}")
+        # print(f"loss: {l}")
+        
         model_loss = -0.5 * (((obs_next_target - obs_next_mu) ** 2) * (-obs_next_logstd).exp() + obs_next_logstd + _LOG_2PI)
 
         return -model_loss.mean()
