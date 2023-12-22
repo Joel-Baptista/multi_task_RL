@@ -51,4 +51,4 @@ class REWARD_WRAP(RewardWrapper):
 
         # print(self.env.unwrapped.data.qpos[start_idx:end_idx].copy())
 
-        return 10 * reward
+        return 100 * reward

@@ -26,6 +26,7 @@ import torch as T
 from models.testings.PPO_exp import CostumAC
 from models import *
 from utils.common import DotDict, model_class_from_str, class_from_str
+from utils.env import add_wrappers
 
 class ObsWrap(ObservationWrapper):
     def __init__(self, env: Env):
@@ -95,7 +96,8 @@ def main():
 
     env = gym.make("FrankaKitchen-v1", render_mode="human",tasks_to_complete=["microwave"])
     env.metadata['render_fps'] = 70
-    env = ObsWrap(env)
+    
+    env = add_wrappers(env, cfg.env.wraps)
     env.reset()
     obs, reward, terminated, truncated, info = env.step(env.action_space.sample())
 
@@ -116,7 +118,7 @@ def main():
 
     # model = algorithm_class(policy_class, env, verbose=1,**cfg.algorithm.args)
     model = algorithm_class(policy_class, env, verbose=1,**cfg.algorithm.args)
-    model = model.load(experiment_path)
+    model = model.load(f"{experiment_path}/model.zip")
     
     print(model.policy)
 

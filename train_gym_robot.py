@@ -18,7 +18,7 @@ from wandb.integration.sb3 import WandbCallback
 import gymnasium as gym
 
 from gymnasium_robotics.envs.franka_kitchen.kitchen_env import KitchenEnv, FrankaRobot
-# from stable_baselines3 import PPO
+from stable_baselines3 import PPO
 from stable_baselines3.sac.policies import SACPolicy
 from stable_baselines3.ppo.policies import MlpPolicy
 import torch as T
@@ -96,6 +96,8 @@ def main():
     print(f"Policy class: {class_from_str(cfg.policy.module, cfg.policy.name)}")
     policy_class = class_from_str(cfg.policy.module, cfg.policy.name)
 
+    cfg.algorithm.args.model_path = experiment_path
+    print(cfg.algorithm.args.model_path)
     if not args['debug']:
         run = wandb.init(
             project=cfg.project, 
@@ -104,8 +106,13 @@ def main():
             name=f"{cfg.algorithm.name}_{experiment_name}"
             )
 
-        model = algorithm_class(policy_class, env, verbose=2, tensorboard_log=f"{experiment_path}/{run.id}",**cfg.algorithm.args)
-    
+        model = algorithm_class(policy_class, 
+                                env, 
+                                verbose=2, 
+                                tensorboard_log=f"{experiment_path}/{run.id}",
+                                model_path=experiment_path,
+                                **cfg.algorithm.args)
+        
         print(model.policy)
         model.learn(
             total_timesteps=cfg.total_timesteps,
