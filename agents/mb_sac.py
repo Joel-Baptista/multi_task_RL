@@ -112,6 +112,8 @@ class SAC(OffPolicyAlgorithm):
         world_steps_to_train: int= 1_000, #-1 to not train
         world_num_updates: int = 10,
         world_batch_size: int = 512,
+        cai_clip: int = None,
+        lambda_cai: int = 1,
         gamma: float = 0.99,
         train_freq: Union[int, Tuple[int, str]] = 1,
         gradient_steps: int = 1,
@@ -133,6 +135,7 @@ class SAC(OffPolicyAlgorithm):
         device: Union[th.device, str] = "auto",
         _init_setup_model: bool = True,
         world_model: dict = None,
+        model_path = None,
     ):
         super().__init__(
             policy,
@@ -172,6 +175,9 @@ class SAC(OffPolicyAlgorithm):
         self.world_steps_to_train = world_steps_to_train 
         self.world_num_updates = world_num_updates
         self.world_batch_size = world_batch_size
+        self.model_path = model_path
+        self.lambda_cai = lambda_cai
+        self.cai_clip = cai_clip
 
         if _init_setup_model:
             self._setup_model()
@@ -189,12 +195,6 @@ class SAC(OffPolicyAlgorithm):
             self.world_model.load_state_dict(
                 th.load(f"{MODELS}/{world_model['path']}/world_model.pt",
                                                       map_location=self.device))
-        
-        # self.world_model = class_from_str(f"models.world_model.mlp", "mlp".upper())(
-        #     inp_dim = env.action_space.shape[0] + env.observation_space.shape[0], 
-        #     outp_dim = env.observation_space.shape[0], 
-        #     hidden_dims = [4156, 2048, 512, 206]
-        #     )
 
         self.world_model.to(self.device)
         print(self.world_model)
@@ -259,6 +259,7 @@ class SAC(OffPolicyAlgorithm):
             if (self._n_updates + gradient_step) % self.world_steps_to_train == 0 \
                 and self.world_steps_to_train > 0:
                 print("Training world model!!!!")
+                self.world_model.train()
                 for _ in range(0, self.world_num_updates):
                     world_data = self.replay_buffer.sample(self.world_batch_size, env=self._vec_normalize_env)
 
@@ -318,8 +319,10 @@ class SAC(OffPolicyAlgorithm):
                 # cai =  cai * 10 ** (-6)
                 # print(f"cai: {cai.mean()}")
                 # print(f"cai2: {cai2.mean()}")
+                if self.cai_clip is not None:
+                    cai = th.clip(cai, 0, self.cai_clip)
 
-                rewards = replay_data.rewards + cai
+                rewards = replay_data.rewards + self.lambda_cai * cai
                 
                 target_q_values = rewards + (1 - replay_data.dones) * self.gamma * next_q_values
 
@@ -436,14 +439,7 @@ class SAC(OffPolicyAlgorithm):
 
     @th.no_grad()
     def calc_causal_influence(self, states: th.Tensor):
-        st = time.time()
-        cai = 0
-
-        # all_kls = th.zeros((self.batch_size, K)).to(self.device)
-        # all_mu_next = th.zeros((K,)).to(self.device)
-        # all_mu_next_ac = th.zeros((K,)).to(self.device)
-        # all_log_std_next_ac = th.zeros((K,)).to(self.device)
-        # all_log_std_next = th.zeros((K,)).to(self.device)
+        self.world_model.eval()
 
         # Get transition distribution with action        
         mu_mean, log_std, _ = self.actor.get_action_dist_params(states)
@@ -519,39 +515,44 @@ class SAC(OffPolicyAlgorithm):
             "inner_log_std_next": inner_logvar_next.mean().mean().detach().cpu().numpy(),
         }
 
-        # print(f"CAI_2 time: {time.time() - st}")
+        self.world_model.train()
         return cai, info
 
-    # def learn(
-    #     self: SelfSAC,
-    #     total_timesteps: int,
-    #     callback: MaybeCallback = None,
-    #     log_interval: int = 4,
-    #     tb_log_name: str = "SAC",
-    #     reset_num_timesteps: bool = True,
-    #     progress_bar: bool = False,
-    # ) -> SelfSAC:
-    #     return super().learn(
-    #         total_timesteps=total_timesteps,
-    #         callback=callback,
-    #         log_interval=log_interval,
-    #         tb_log_name=tb_log_name,
-    #         reset_num_timesteps=reset_num_timesteps,
-    #         progress_bar=progress_bar,
-    #     )
-    def save(self, path) -> None:
+    def learn(
+        self: SelfSAC,
+        total_timesteps: int,
+        callback: MaybeCallback = None,
+        log_interval: int = 4,
+        tb_log_name: str = "SAC",
+        reset_num_timesteps: bool = True,
+        progress_bar: bool = False,
+    ) -> SelfSAC:
+        return super().learn(
+            total_timesteps=total_timesteps,
+            callback=callback,
+            log_interval=log_interval,
+            tb_log_name=tb_log_name,
+            reset_num_timesteps=reset_num_timesteps,
+            progress_bar=progress_bar,
+        )
+    def save(self, _) -> None:
         
-        th.save(self.world_model.state_dict(), f"{path}/world_model.pt")
-        th.save(self.actor.state_dict(), f"{path}/actor.pt")
-        th.save(self.critic.state_dict(), f"{path}/critic.pt")
-        th.save(self.critic_target.state_dict(), f"{path}/critic_target.pt")
+        if self.model_path is None:
+            print(f"Model path is {self.model_path}. Saving was not performed")
+        else:
+            print("-------------SAVING MODELS-------------------------")
+            th.save(self.world_model.state_dict(), f"{self.model_path}/world_model.pt")
+            th.save(self.actor.state_dict(), f"{self.model_path}/actor.pt")
+            th.save(self.critic.state_dict(), f"{self.model_path}/critic.pt")
+            th.save(self.critic_target.state_dict(), f"{self.model_path}/critic_target.pt")
 
-    def load(self, path):
-        
-        self.world_model.load_state_dict(th.load(f"{path}/world_model.pt", map_location=self.device))
-        self.actor.load_state_dict(th.load(f"{path}/actor.pt", map_location=self.device))
-        self.critic.load_state_dict(th.load(f"{path}/critic.pt", map_location=self.device))
-        self.critic_target.load_state_dict(th.load(f"{path}/critic_target.pt", map_location=self.device))
+    def load(self, _):
+
+        print("-------------LOADING MODELS-------------------------")
+        self.world_model.load_state_dict(th.load(f"{self.model_path}/world_model.pt", map_location=self.device))
+        self.actor.load_state_dict(th.load(f"{self.model_path}/actor.pt", map_location=self.device))
+        self.critic.load_state_dict(th.load(f"{self.model_path}/critic.pt", map_location=self.device))
+        self.critic_target.load_state_dict(th.load(f"{self.model_path}/critic_target.pt", map_location=self.device))
 
 
     def _excluded_save_params(self) -> List[str]:

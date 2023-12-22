@@ -143,7 +143,8 @@ class MLP(nn.Module):
         # print(f"((-obs_next_logstd).exp()).mean(): {b}")
         # print(f"obs_next_logstd: {c}")
         # print(f"(((obs_next_target - obs_next_mu) ** 2) * (-obs_next_logstd).exp()).mean(): {d}")
-        # print(f"loss: {l}")
+        # print(f"(((obs_next_target - obs_next_mu) ** 2) * (-obs_next_logstd).exp()).mean(): {d}")
+        
         
         model_loss = -0.5 * (((obs_next_target - obs_next_mu) ** 2) * (-obs_next_logstd).exp() + obs_next_logstd + _LOG_2PI)
 

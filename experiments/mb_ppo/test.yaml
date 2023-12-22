@@ -1,13 +1,17 @@
 project: "Kitchen_MultiTask"
-total_timesteps: 10_000_000
-checkpoints: 20 
+num_test: 10 
 
 env:
   name: "FrankaKitchen-v1"
   args:
+    render_mode: Null # human - rgb_array
     tasks_to_complete:
+      # - "bottom burner"
+      # - "top burner"
+      # - "light switch"
+      # - "slide cabinet"
       - "microwave"
-
+      # - "kettle"
     terminate_on_tasks_completed: True
     remove_task_when_completed: True
     object_noise_ratio: 0.0005
@@ -23,31 +27,35 @@ env:
 
 
 policy: 
-  name: "SACPolicy"
-  module: "stable_baselines3.sac.policies"
+  name: "MlpPolicy"
+  module: "stable_baselines3.ppo.policies"
 
 algorithm: 
-  name: "SAC"
-  module: "agents.mb_sac"
+  name: "MB_PPO"
+  module: "agents.mb_ppo"
   args:
       learning_rate: 0.0003
-      buffer_size: 1_000_000
-      learning_starts: 256
-      batch_size: 256
-      tau: 0.005
+      n_steps: 2048
+      batch_size: 64
+      n_epochs: 10
       gamma: 0.99
-      K: 16
-      train_freq: 1
-      gradient_steps: 1
-      lambda_cai: 0.2
-      cai_clip: 100
-      world_steps_to_train: 500 #-1 to not train
-      world_num_updates: 10
-      world_batch_size: 512
-      ent_coef: 1 # Does not have learned parameter for entropy regulator
-      action_noise: Null
+      gae_lambda: 0.95
+      clip_range: 0.2
+      clip_range_vf: Null
+      normalize_advantage: True
+      ent_coef: 0.0
+      vf_coef: 0.5
+      max_grad_norm: 0.5
+      use_sde: False
+      sde_sample_freq: -1
+      target_kl: Null
+      stats_window_size: 100
       seed: Null
       device: "cuda:1"
+      K: 16
+      world_steps_to_train: 500 #-1 to not train
+      world_num_updates: 10
+      world_batch_size: 256
       world_model:
         name: "mlp"
         module: "models.world_model"
@@ -56,6 +64,5 @@ algorithm:
         args:
           hidden_dims: [4048, 2012, 512, 206]
           hidden_activation: "ReLU"
-      policy_kwargs:
-        net_arch: [512, 256, 256]
+
 
