@@ -12,6 +12,7 @@ RUN pip install gymnasium-robotics
 RUN pip install stable-baselines3
 COPY requirements.txt /tmp/
 RUN pip install --requirement /tmp/requirements.txt
+RUN pip install wandb -U --pre
 
 RUN mkdir /usr/local/gymnasium/logs
 RUN mkdir /usr/local/gymnasium/models

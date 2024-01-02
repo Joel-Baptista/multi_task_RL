@@ -5,6 +5,7 @@ import argparse
 import os
 import sys
 import shutil
+import copy
 
 import yaml
 from colorama import Fore
@@ -16,18 +17,13 @@ from wandb.integration.sb3 import WandbCallback
 
 # Reinforcement Learning
 import gymnasium as gym
-
-from gymnasium_robotics.envs.franka_kitchen.kitchen_env import KitchenEnv, FrankaRobot
-from stable_baselines3 import PPO
-from stable_baselines3.sac.policies import SACPolicy
-from stable_baselines3.ppo.policies import MlpPolicy
 import torch as T
+from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback, EvalCallback
 
 # My Own
-from models.testings.PPO_exp import CostumAC
-from models import *
 from utils.common import DotDict, model_class_from_str, class_from_str
 from utils.env import add_wrappers
+from callbacks.video_recorder import VideoRecorder
 
 # # Mujoco
 # try:
@@ -74,14 +70,17 @@ def main():
         # create folder to the results.
         os.makedirs(experiment_path)
         print(f"Path create: {experiment_path}") 
+        shutil.copy(cfg_path, f"{experiment_path}/train.yaml")
     
     device = T.device("cuda:0" if T.cuda.is_available() else 'cpu')
     print(cfg.algorithm.args)
     print(f"device:{device}")
 
-    env = gym.make(cfg.env.name, **cfg.env.args)
+    env = gym.make(cfg.env.name,**cfg.env.args)
+    record_env = gym.make(cfg.env.name, render_mode="rgb_array",**cfg.env.args)
     
     env = add_wrappers(env, cfg.env.wraps)
+    record_env = add_wrappers(record_env, cfg.env.wraps)
 
     env.reset()
     obs, reward, terminated, truncated, info = env.step(env.action_space.sample())
@@ -103,7 +102,7 @@ def main():
             project=cfg.project, 
             sync_tensorboard=True,
             config=cfg,
-            name=f"{cfg.algorithm.name}_{experiment_name}"
+            name=f"{cfg.algorithm.name}_{experiment_name}{args['identifier']}"
             )
 
         model = algorithm_class(policy_class, 
@@ -112,17 +111,27 @@ def main():
                                 tensorboard_log=f"{experiment_path}/{run.id}",
                                 model_path=experiment_path,
                                 **cfg.algorithm.args)
+        # Setup Callbacks
         
-        print(model.policy)
-        model.learn(
-            total_timesteps=cfg.total_timesteps,
-            log_interval=1,
-            callback=WandbCallback(
+        eval_callback = EvalCallback(model.env, best_model_save_path=f'{experiment_path}/best_model',
+                             log_path=f'{experiment_path}/best_model', eval_freq=cfg.eval_freq,
+                             deterministic=True, render=False)
+        wand_callback = WandbCallback(
                 verbose=2,
                 model_save_path=experiment_path,
                 model_save_freq= int(cfg.total_timesteps / cfg.checkpoints),
                 log = "all"
                 )
+        
+        video_callback = VideoRecorder(record_env, log_path=experiment_path, record_freq=cfg.record_freq)
+        
+        callbacks = CallbackList([eval_callback, wand_callback, video_callback])
+
+        print(model.policy)
+        model.learn(
+            total_timesteps=cfg.total_timesteps,
+            log_interval=1,
+            callback=callbacks
             )
     else:
         model = algorithm_class(policy_class, 
