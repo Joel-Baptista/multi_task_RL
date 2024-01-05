@@ -2,8 +2,8 @@ project: "Kitchen_MultiTask"
 total_timesteps: 10_000_000
 checkpoints: 1_000
 eval_freq: 500
-# record_freq: 50
-record_freq: 100_000
+record_freq: -1
+# record_freq: 100_000
 
 env:
   name: "FrankaKitchen-v1"

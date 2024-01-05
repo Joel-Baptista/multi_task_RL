@@ -12,8 +12,8 @@ class GOAL_CONDITIONED_WRAP(ObservationWrapper):
         super().__init__(env)
         self.env = env
         dim = 0
-        print(env.observation_space)
-        print(self.flatten_space(env.observation_space))
+        # print(env.observation_space)
+        # print(self.flatten_space(env.observation_space))
         for box in self.flatten_space(env.observation_space):
             dim += box.shape[0]
         print(env.observation_space)
@@ -25,6 +25,8 @@ class GOAL_CONDITIONED_WRAP(ObservationWrapper):
         )
 
     def observation(self, observation: Any) -> Any:
+        # print(f"Pre flatten: {observation}")
+        # print(f"Post flatten: {self.flatten_obs(observation)}")
         return np.array(self.flatten_obs(observation))
 
     def flatten_space(self, obs):

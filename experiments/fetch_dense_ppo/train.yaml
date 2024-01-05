@@ -1,18 +1,29 @@
-project: "Kitchen_MultiTask"
+project: "Fetch_MultiTask"
 total_timesteps: 10_000_000
-checkpoints: 20 
+checkpoints: 1_000
+eval_freq: 500
+record_freq: -1
+# record_freq: 100_000
 
 env:
-  name: "FrankaKitchen-v1"
+  name: "FetchPickAndPlace-v2"
   args:
-    render_mode: Null # human - rgb_array
-    tasks_to_complete:
-      # - "bottom burner"
-      # - "top burner"
-      # - "light switch"
-      # - "slide cabinet"
-      - "microwave"
-      # - "kettle"
+    reward_type: "dense"
+    # tasks_to_complete:
+    #   - "microwave"
+
+    # terminate_on_tasks_completed: True
+    # remove_task_when_completed: True
+    # object_noise_ratio: 0.0005
+    # robot_noise_ratio: 0.01
+    max_episode_steps: 100
+  wraps:
+    - wrap:
+        name: "reward_wrap"
+        module: "wraps.reward"
+    - wrap:
+        name: "goal_conditioned_wrap"
+        module: "wraps.observation"
 
 policy: 
   name: "MlpPolicy"
@@ -31,7 +42,7 @@ algorithm:
       clip_range: 0.2
       clip_range_vf: Null
       normalize_advantage: True
-      ent_coef: 0.0
+      ent_coef: 1.0
       vf_coef: 0.5
       max_grad_norm: 0.5
       use_sde: False

@@ -69,12 +69,11 @@ def main():
 
         # create folder to the results.
         os.makedirs(experiment_path)
+        os.makedirs(f"{experiment_path}/best_model")
         print(f"Path create: {experiment_path}") 
         shutil.copy(cfg_path, f"{experiment_path}/train.yaml")
     
-    device = T.device("cuda:0" if T.cuda.is_available() else 'cpu')
     print(cfg.algorithm.args)
-    print(f"device:{device}")
 
     env = gym.make(cfg.env.name,**cfg.env.args)
     record_env = gym.make(cfg.env.name, render_mode="rgb_array",**cfg.env.args)
@@ -105,16 +104,18 @@ def main():
             name=f"{cfg.algorithm.name}_{experiment_name}{args['identifier']}"
             )
 
+        if "model_path" in cfg['algorithm']['args'].keys():
+            cfg["algorithm"]["args"]["model_path"] = experiment_path
+
         model = algorithm_class(policy_class, 
                                 env, 
                                 verbose=2, 
                                 tensorboard_log=f"{experiment_path}/{run.id}",
-                                model_path=experiment_path,
                                 **cfg.algorithm.args)
         # Setup Callbacks
         
-        eval_callback = EvalCallback(model.env, best_model_save_path=f'{experiment_path}/best_model',
-                             log_path=f'{experiment_path}/best_model', eval_freq=cfg.eval_freq,
+        eval_callback = EvalCallback(model.env, best_model_save_path=f'{experiment_path}',
+                             log_path=f'{experiment_path}', eval_freq=cfg.eval_freq,
                              deterministic=True, render=False)
         wand_callback = WandbCallback(
                 verbose=2,
@@ -126,7 +127,6 @@ def main():
         video_callback = VideoRecorder(record_env, log_path=experiment_path, record_freq=cfg.record_freq)
         
         callbacks = CallbackList([eval_callback, wand_callback, video_callback])
-
         print(model.policy)
         model.learn(
             total_timesteps=cfg.total_timesteps,

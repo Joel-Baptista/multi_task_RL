@@ -1,30 +1,29 @@
-project: "Kitchen_MultiTask"
-num_test: 10 
+project: "Fetch_MultiTask"
+total_timesteps: 10_000_000
+checkpoints: 1_000
+eval_freq: 500
+record_freq: -1
+# record_freq: 100_000
 
 env:
-  name: "FrankaKitchen-v1"
+  name: "FetchPickAndPlace-v2"
   args:
-    tasks_to_complete:
-      # - "bottom burner"
-      # - "top burner"
-      # - "light switch"
-      # - "slide cabinet"
-      - "microwave"
-      # - "kettle"
-    terminate_on_tasks_completed: True
-    remove_task_when_completed: True
-    object_noise_ratio: 0.0005
-    robot_noise_ratio: 0.01
-    max_episode_steps: 280
+    reward_type: "dense"
+    # tasks_to_complete:
+    #   - "microwave"
+
+    # terminate_on_tasks_completed: True
+    # remove_task_when_completed: True
+    # object_noise_ratio: 0.0005
+    # robot_noise_ratio: 0.01
+    max_episode_steps: 100
   wraps:
     - wrap:
         name: "reward_wrap"
         module: "wraps.reward"
     - wrap:
-        name: "observation_wrap"
+        name: "goal_conditioned_wrap"
         module: "wraps.observation"
-
-        
 policy: 
   name: "SACPolicy"
   module: "stable_baselines3.sac.policies"
@@ -43,6 +42,4 @@ algorithm:
       gradient_steps: 2
       action_noise: Null
       seed: Null
-      device: "cuda:0"
-
-
+      device: "cuda:1"

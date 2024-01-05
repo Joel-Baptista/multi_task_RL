@@ -44,7 +44,7 @@ algorithm:
       clip_range: 0.2
       clip_range_vf: Null
       normalize_advantage: True
-      ent_coef: 0.0
+      ent_coef: 1.0
       vf_coef: 0.5
       max_grad_norm: 0.5
       use_sde: False

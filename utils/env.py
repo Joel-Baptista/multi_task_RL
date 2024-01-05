@@ -4,6 +4,8 @@ from typing import Any, ClassVar, Dict, List, Optional, Tuple, Type, TypeVar, Un
 
 def add_wrappers(env: Env, wrappers: Dict) -> Env:
     
+    if wrappers is None: wrappers = {}
+    
     for wrap in wrappers:
         wrap_class = class_from_str(f"{wrap['wrap']['module']}.{wrap['wrap']['name']}", wrap['wrap']['name'].upper())
         env = wrap_class(env)

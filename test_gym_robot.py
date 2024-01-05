@@ -28,43 +28,6 @@ from models import *
 from utils.common import DotDict, model_class_from_str, class_from_str
 from utils.env import add_wrappers
 
-class ObsWrap(ObservationWrapper):
-    def __init__(self, env: Env):
-        super().__init__(env)
-        self.env = env
-        dim = 0
-        
-        for box in self.flatten_space(env.observation_space):
-            dim += box.shape[0]
-
-        self.observation_space = spaces.Box(
-            low = -math.inf,
-            high = math.inf,
-            shape = (dim,),
-            dtype= np.float64
-        )
-
-    def observation(self, observation: Any) -> Any:
-        return np.array(self.flatten_obs(observation))
-
-    def flatten_space(self, obs):
-        result=[]
-        for key in obs:
-            if isinstance(obs[key], spaces.Dict) or isinstance(obs[key], dict):
-                result.extend(self.flatten_space(obs[key]))
-            else:
-                result.append(obs[key])
-        return result
-
-    def flatten_obs(self, obs):
-        result=[]
-        for key in obs:
-            if isinstance(obs[key], dict):
-                result.extend(self.flatten_obs(obs[key]))
-            else:
-                result.extend(list(obs[key]))
-        return result
-
 def main():
     parser = argparse.ArgumentParser(description='Train asl2text models.')
     parser.add_argument('-en', '--experiment_name', type=str)
@@ -78,13 +41,15 @@ def main():
         print(f"{Fore.YELLOW}Missing input 'experiment_name'. Assumed to be 'baseline'{Fore.RESET}")
 
     experiment_name = args['experiment_name']
-    experiment_path = f'{os.getenv("PHD_MODELS")}/{experiment_name}{args["identifier"]}'    
+    experiment_path = f'{os.getenv("PHD_MODELS")}/{experiment_name}'    
 
     # load train config.
     PHD_ROOT = os.getenv("PHD_ROOT")
     sys.path.append(PHD_ROOT)
     cfg_path = f"{PHD_ROOT}/multi_task_RL/experiments/{experiment_name}/test.yaml"
-
+    
+    experiment_path += args['identifier']
+    print(experiment_path)
     with open(cfg_path) as f:
         cfg = DotDict(yaml.load(f, Loader=yaml.loader.SafeLoader))
 
@@ -94,7 +59,7 @@ def main():
     # create folder to the results.
     print(f"Path create: {experiment_path}")
 
-    env = gym.make("FrankaKitchen-v1", render_mode="human",tasks_to_complete=["microwave"])
+    env = gym.make(cfg.env.name, render_mode="human",**cfg.env.args)
     env.metadata['render_fps'] = 70
     
     env = add_wrappers(env, cfg.env.wraps)
@@ -102,10 +67,6 @@ def main():
     obs, reward, terminated, truncated, info = env.step(env.action_space.sample())
 
     device = T.device("cuda:0" if T.cuda.is_available() else 'cpu')
-    print(f"device:{device}")
-    print(cfg.algorithm.args)
-
-
     print(f"device:{device}")
     print(cfg.algorithm.args)
 
@@ -117,12 +78,19 @@ def main():
     policy_class = class_from_str(cfg.policy.module, cfg.policy.name)
 
     # model = algorithm_class(policy_class, env, verbose=1,**cfg.algorithm.args)
+    if "model_path" in cfg['algorithm']['args'].keys():
+            cfg["algorithm"]["args"]["model_path"] = experiment_path
+
     model = algorithm_class(policy_class, 
                             env, 
                             verbose=1,
-                            model_path=experiment_path,
                             **cfg.algorithm.args)
-    model.load(f"{experiment_path}")
+    
+    try:
+        model.load(f"{experiment_path}")
+    except: #TODO find more elegant fix
+        print(f"{Fore.YELLOW}Stable Baselines models need to specify 'model.zip'{Fore.RESET}")
+        model.load(f"{experiment_path}/model.zip")
     
     print(model.policy)
 

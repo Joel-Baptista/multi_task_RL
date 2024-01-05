@@ -67,9 +67,9 @@ class VideoRecorder(BaseCallback):
 
         :return: If the callback returns False, training is aborted early.
         """
-
+        # print(self.num_timesteps)
         if (self.num_timesteps % self.record_freq) == 0 and self.record_freq > 0:
-
+            print("-------------------Recording Episode!-------------------------")
             obs, _ = self.recording_env.reset()
             total_reward = 0
             timesteps = 0

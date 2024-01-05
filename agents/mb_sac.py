@@ -535,16 +535,20 @@ class SAC(OffPolicyAlgorithm):
             reset_num_timesteps=reset_num_timesteps,
             progress_bar=progress_bar,
         )
-    def save(self, _) -> None:
-        
+    def save(self, local_path: str = "") -> None:
+        path = self.model_path
+
+        if "best_model" in local_path:
+            path = local_path
+
         if self.model_path is None:
             print(f"Model path is {self.model_path}. Saving was not performed")
         else:
             print("-------------SAVING MODELS-------------------------")
-            th.save(self.world_model.state_dict(), f"{self.model_path}/world_model.pt")
-            th.save(self.actor.state_dict(), f"{self.model_path}/actor.pt")
-            th.save(self.critic.state_dict(), f"{self.model_path}/critic.pt")
-            th.save(self.critic_target.state_dict(), f"{self.model_path}/critic_target.pt")
+            th.save(self.world_model.state_dict(), f"{path}/world_model.pt")
+            th.save(self.actor.state_dict(), f"{path}/actor.pt")
+            th.save(self.critic.state_dict(), f"{path}/critic.pt")
+            th.save(self.critic_target.state_dict(), f"{path}/critic_target.pt")
 
     def load(self, _):
 

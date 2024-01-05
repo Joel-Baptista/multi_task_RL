@@ -1,25 +1,30 @@
-project: "Kitchen_MultiTask"
-num_test: 10 
-
+project: "Fetch_MultiTask"
+total_timesteps: 10_000_000
+checkpoints: 1_000
+eval_freq: 500
+record_freq: -1
+# record_freq: 100_000
 
 env:
-  name: "FrankaKitchen-v1"
+  name: "FetchPickAndPlace-v2"
   args:
-    tasks_to_complete:
-      - "microwave"
+    reward_type: "sparse"
+    # tasks_to_complete:
+    #   - "microwave"
 
-    terminate_on_tasks_completed: True
-    remove_task_when_completed: True
-    object_noise_ratio: 0.0005
-    robot_noise_ratio: 0.01
-    max_episode_steps: 280
+    # terminate_on_tasks_completed: True
+    # remove_task_when_completed: True
+    # object_noise_ratio: 0.0005
+    # robot_noise_ratio: 0.01
+    max_episode_steps: 100
   wraps:
     - wrap:
         name: "reward_wrap"
         module: "wraps.reward"
     - wrap:
-        name: "observation_wrap"
+        name: "goal_conditioned_wrap"
         module: "wraps.observation"
+
 
 policy: 
   name: "SACPolicy"
@@ -35,19 +40,19 @@ algorithm:
       batch_size: 256
       tau: 0.005
       gamma: 0.99
-      K: 16
+      K: 32
       train_freq: 1
       gradient_steps: 1
       lambda_cai: 0.2
-      cai_clip: 100
-      world_steps_to_train: 500 #-1 to not train
+      cai_clip: Null
+      world_steps_to_train: 100 #-1 to not train
       world_num_updates: 10
       world_batch_size: 512
-      ent_coef: 1 # Does not have learned parameter for entropy regulator
+      ent_coef: auto # Number for fixed, "auto" for learned
       action_noise: Null
       seed: Null
-      model_path: Null
       device: "cuda:1"
+      model_path: Null
       world_model:
         name: "mlp"
         module: "models.world_model"
@@ -58,3 +63,4 @@ algorithm:
           hidden_activation: "ReLU"
       policy_kwargs:
         net_arch: [512, 256, 256]
+
