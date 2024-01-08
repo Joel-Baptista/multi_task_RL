@@ -21,6 +21,8 @@ env:
     - wrap:
         name: "reward_wrap"
         module: "wraps.reward"
+        args:
+          reward_scale: 1.0
     - wrap:
         name: "goal_conditioned_wrap"
         module: "wraps.observation"
@@ -35,7 +37,7 @@ algorithm:
   module: "agents.mb_sac"
   args:
       learning_rate: 0.0003
-      buffer_size: 1_000_000
+      buffer_size: 100_000
       learning_starts: 256
       batch_size: 64
       tau: 0.005
@@ -45,9 +47,9 @@ algorithm:
       gradient_steps: 1
       lambda_cai: 0.2
       cai_clip: Null
-      world_steps_to_train: 100 #-1 to not train
-      world_num_updates: 10
-      world_batch_size: 512
+      world_steps_to_train: 50 #-1 to not train MAYBE make more frequent updates
+      world_num_updates: 20
+      world_batch_size: 1024
       ent_coef: auto # Number for fixed, "auto" for learned
       action_noise: Null
       seed: Null

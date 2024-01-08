@@ -7,9 +7,10 @@ ActType = TypeVar("ActType")
 ObsType = TypeVar("ObsType")
 
 class REWARD_WRAP(RewardWrapper):
-    def __init__(self, env: Env):
+    def __init__(self, env: Env, reward_scale: float = 1.0):
         super().__init__(env)
         self.env = env
+        self.reward_scale = reward_scale
 
     def step(
         self, action: ActType
@@ -51,4 +52,4 @@ class REWARD_WRAP(RewardWrapper):
 
         # print(self.env.unwrapped.data.qpos[start_idx:end_idx].copy())
 
-        return 100 * reward
+        return self.reward_scale * reward
