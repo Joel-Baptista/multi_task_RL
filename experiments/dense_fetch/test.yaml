@@ -1,10 +1,10 @@
 project: "Fetch_MultiTask"
-num_test: 10 
+num_test: 15
 
 env:
   name: "FetchPickAndPlace-v2"
   args:
-    reward_type: "sparse"
+    reward_type: "dense"
     # tasks_to_complete:
     #   - "microwave"
 
@@ -38,4 +38,5 @@ algorithm:
       gradient_steps: 2
       action_noise: Null
       seed: Null
-      device: "cuda:0"
+      # device: "cuda:0"
+      device: "cpu"

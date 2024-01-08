@@ -240,6 +240,10 @@ class SAC(OffPolicyAlgorithm):
         self.critic_target = self.policy.critic_target
 
     def train(self, gradient_steps: int, batch_size: int = 64) -> None:
+        
+        # st = time.time()
+        # times = []
+
         # Switch to train mode (this affects batch norm / dropout)
         self.policy.set_training_mode(True)
         # Update optimizers learning rate
@@ -253,12 +257,16 @@ class SAC(OffPolicyAlgorithm):
         ent_coef_losses, ent_coefs = [], []
         actor_losses, critic_losses, world_model_losses = [], [], []
 
+        # print(f"Setup time: {time.time() - st}")
+        # times.append(time.time() - st)
+        # st = time.time()
+
         for gradient_step in range(gradient_steps):
             # Sample replay buffer
             replay_data = self.replay_buffer.sample(batch_size, env=self._vec_normalize_env)  # type: ignore[union-attr]
             if (self._n_updates + gradient_step) % self.world_steps_to_train == 0 \
                 and self.world_steps_to_train > 0:
-                print("Training world model!!!!")
+                # print("Training world model!!!!")
                 self.world_model.train()
                 for _ in range(0, self.world_num_updates):
                     world_data = self.replay_buffer.sample(self.world_batch_size, env=self._vec_normalize_env)
@@ -274,7 +282,11 @@ class SAC(OffPolicyAlgorithm):
                     self.world_model.optim.step()
 
                     world_model_losses.append(model_loss.item())
-
+                
+                # print(f"Train World Model time: {time.time() - st}")
+                # times.append(time.time() - st)
+                # st = time.time()
+                
             # We need to sample because `log_std` may have changed between two gradient steps
             if self.use_sde:
                 self.actor.reset_noise()
@@ -282,6 +294,10 @@ class SAC(OffPolicyAlgorithm):
             # Action by the current actor for the sampled state
             actions_pi, log_prob = self.actor.action_log_prob(replay_data.observations)
             log_prob = log_prob.reshape(-1, 1)
+
+            # print(f"Sample actions time: {time.time() - st}")
+            # times.append(time.time() - st)
+            # st = time.time()
 
             ent_coef_loss = None
             if self.ent_coef_optimizer is not None and self.log_ent_coef is not None:
@@ -303,6 +319,10 @@ class SAC(OffPolicyAlgorithm):
                 ent_coef_loss.backward()
                 self.ent_coef_optimizer.step()
 
+            # print(f"Backprop Entropy time: {time.time() - st}")
+            # times.append(time.time() - st)
+            # st = time.time()
+
             with th.no_grad():
                 # Select action according to policy
                 next_actions, next_log_prob = self.actor.action_log_prob(replay_data.next_observations)
@@ -312,6 +332,10 @@ class SAC(OffPolicyAlgorithm):
                 # add entropy term
                 next_q_values = next_q_values - ent_coef * next_log_prob.reshape(-1, 1)
                 # td error + entropy term
+
+                # print(f"Calc Q target time: {time.time() - st}")
+                # times.append(time.time() - st)
+                # st = time.time()
 
                 cai, info = self.calc_causal_influence(replay_data.observations)
                 cai = cai.unsqueeze(1)
@@ -324,6 +348,11 @@ class SAC(OffPolicyAlgorithm):
 
                 rewards = replay_data.rewards + self.lambda_cai * cai
                 
+                # print(f"Calc CAI time: {time.time() - st}")
+                # cai_time = time.time() - st
+                # times.append(time.time() - st)
+                # st = time.time()
+
                 target_q_values = rewards + (1 - replay_data.dones) * self.gamma * next_q_values
 
             # Get current Q-values estimates for each critic network
@@ -339,6 +368,10 @@ class SAC(OffPolicyAlgorithm):
             self.critic.optimizer.zero_grad()
             critic_loss.backward()
             self.critic.optimizer.step()
+            
+            # print(f"Optimize Critic time: {time.time() - st}")
+            # times.append(time.time() - st)
+            # st = time.time()
 
             # Compute actor loss
             # Alternative: actor_loss = th.mean(log_prob - qf1_pi)
@@ -352,12 +385,19 @@ class SAC(OffPolicyAlgorithm):
             self.actor.optimizer.zero_grad()
             actor_loss.backward()
             self.actor.optimizer.step()
+            
+            # print(f"Optimize Actor time: {time.time() - st}")
+            # times.append(time.time() - st)
+            # st = time.time()
 
             # Update target networks
             if gradient_step % self.target_update_interval == 0:
                 polyak_update(self.critic.parameters(), self.critic_target.parameters(), self.tau)
                 # Copy running stats, see GH issue #996
                 polyak_update(self.batch_norm_stats, self.batch_norm_stats_target, 1.0)
+                # print(f"Polyak Update time: {time.time() - st}")
+                # times.append(time.time() - st)
+                # st = time.time()
 
         self._n_updates += gradient_steps
 
@@ -382,99 +422,94 @@ class SAC(OffPolicyAlgorithm):
         if len(ent_coef_losses) > 0:
             self.logger.record("train/ent_coef_loss", np.mean(ent_coef_losses))
 
-    # @th.no_grad()
-    # def calc_causal_influence(self, states: th.Tensor):
-    #     st = time.time()
-    #     cai = 0
-    #     K = 64
-
-    #     all_kls = th.zeros((self.batch_size, K)).to(self.device)
-    #     all_mu_next = th.zeros((K,)).to(self.device)
-    #     all_mu_next_ac = th.zeros((K,)).to(self.device)
-    #     all_log_std_next_ac = th.zeros((K,)).to(self.device)
-    #     all_log_std_next = th.zeros((K,)).to(self.device)
-
-    #     # Get transition distribution with action        
-    #     mu_mean, log_std, _ = self.actor.get_action_dist_params(states)
-
-    #     for j in range(0, K):
-    #         actions = self.actor.action_dist.actions_from_params(mu_mean, log_std, deterministic=False, **{})
-            
-    #         model_inp = th.concat((states, actions), dim=1).type(th.float32)
-    #         mu_next_ac, log_std_next_ac = self.world_model(model_inp)
-
-    #         # Get transition distribution with action averaged out
-    #         all_actions = th.zeros((K, self.batch_size, *self.action_space.shape)).to(self.device)
-    #         for i in range(0, K):
-    #             actions = self.actor.action_dist.actions_from_params(mu_mean, log_std, deterministic=False, **{})
-                
-    #             all_actions[i] = actions.unsqueeze(0)
-
-    #         model_inp = th.concat((states.repeat((K, 1)), all_actions.view(-1, *self.action_space.shape)), dim=1).type(th.float32)
-
-    #         mu_next, log_std_next = self.world_model(model_inp)
-
-    #         mu_next = mu_next.view(self.batch_size, K, -1).mean(dim=1)
-    #         log_std_next = log_std_next.view(self.batch_size, K, -1).mean(dim=1)
-
-    #         all_log_std_next[i] = log_std_next.mean()
-    #         all_log_std_next_ac[i] = log_std_next_ac.mean()
-    #         all_mu_next_ac[i] = mu_next_ac.mean()
-    #         all_mu_next[i] = mu_next.mean()
-
-    #         kls = kl_div(mu_next_ac, log_std_next_ac.exp() ** 2, mu_next, log_std_next.exp() ** 2)
-    #         kls = th.clip(kls, min=0)
-            
-    #         all_kls[:, j] = kls
-
-    #     self.logger.record("train/mu_next_ac", all_mu_next_ac.mean().detach().cpu().numpy())
-    #     self.logger.record("train/mu_next", all_mu_next.mean().detach().cpu().numpy())
-    #     self.logger.record("train/sigma_next_ac", all_log_std_next_ac.mean().detach().cpu().numpy())
-    #     self.logger.record("train/sigma_next", all_log_std_next.mean().detach().cpu().numpy())        
-
-    #     cai = th.mean(all_kls, dim=1)
-    #     print(f"CAI time: {time.time() - st}")
-    #     return cai
+        # print(f"Log time: {time.time() - st}")
+        # times.append(time.time() - st)
+        # st = time.time()
+        
+        # print(f"Total time {np.sum(times)}")
+        # print(f"CAI time percent {cai_time / np.sum(times) * 100}")
+        # print("----------------------------------------------------------------------------")
+        # print("----------------------------------------------------------------------------")
+        # print("----------------------------------------------------------------------------")
 
 
     @th.no_grad()
     def calc_causal_influence(self, states: th.Tensor):
+        # print("---------------------------------------------------------------------")
+        # times = []
+        # st = time.time()
+
         self.world_model.eval()
 
         # Get transition distribution with action        
-        mu_mean, log_std, _ = self.actor.get_action_dist_params(states)
+        # mu_mean, log_std, _ = self.actor.get_action_dist_params(states)
+
+        # print(f"Get action dist: {time.time() - st}")
+        # times.append(time.time() - st)
+        # st = time.time()
 
         # print(f"mu_mean: {mu_mean.shape}")
 
-        outer_actions = th.zeros((self.K, self.batch_size, *self.action_space.shape)).to(self.device)
-        outer_states = th.zeros((self.K, self.batch_size, *self.observation_space.shape)).to(self.device)
+        actions = th.rand(self.batch_size, self.K, *self.action_space.shape).to(self.device) * 2 - 1
+        # outer_actions = th.zeros((self.K, self.batch_size, *self.action_space.shape)).to(self.device)
+        # outer_states = th.zeros((self.K, self.batch_size, *self.observation_space.shape)).to(self.device)
 
-        for j in range(0, self.K):
-            actions = self.actor.action_dist.actions_from_params(mu_mean, log_std, deterministic=False, **{})
-            outer_actions[j] = actions
-            outer_states[j] = states
+        # for j in range(0, self.K):
+        #     actions = self.actor.action_dist.actions_from_params(mu_mean, log_std, deterministic=False, **{})
+        #     outer_actions[j] = actions
+        #     outer_states[j] = states
+
+        # print(f"Sample outer actions and states: {time.time() - st}")
+        # times.append(time.time() - st)
+        # st = time.time()
         
-        outer_states = outer_states.view(self.K * self.batch_size, *self.observation_space.shape)
-        outer_actions = outer_actions.view(self.K * self.batch_size, *self.action_space.shape)
+        states = (states.unsqueeze(1).repeat(1, self.K, 1).view(-1, states.shape[-1]))
+        actions = actions.view(self.K * self.batch_size, *self.action_space.shape)
 
-        model_inp = th.concat((outer_states, outer_actions), dim=1).type(th.float32)
+        # print(f"Reshape outer states and actions: {time.time() - st}")
+        # times.append(time.time() - st)
+        # st = time.time()
+
+        model_inp = th.concat((states, actions), dim=1).type(th.float32)
         outer_mu_next, outer_logvar_next = self.world_model(model_inp)
 
-        # Get transition distribution with action averaged out
-        inner_actions = th.zeros((self.K, self.batch_size, *self.action_space.shape)).to(self.device)
-        for i in range(0, self.K):
-            actions = self.actor.action_dist.actions_from_params(mu_mean, log_std, deterministic=False, **{})
-            inner_actions[i] = actions
+        outer_mu_next = outer_mu_next.view(self.batch_size, self.K, -1) 
+        outer_logvar_next = outer_logvar_next.view(self.batch_size, self.K, -1) 
 
-        # outer_states = outer_states.view(K * self.batch_size, *self.observation_space.shape)
+        # print(f"Get outer next states: {time.time() - st}")
+        # times.append(time.time() - st)
+        # st = time.time()
+
+        # Get transition distribution with action averaged out
+        
+        inner_actions = th.rand(self.batch_size, self.K, *self.action_space.shape).to(self.device) * 2 - 1
         inner_actions = inner_actions.view(self.K * self.batch_size, *self.action_space.shape)
 
-        model_inp = th.concat((states.repeat((self.K, 1)), inner_actions), dim=1).type(th.float32)
+        # inner_actions = th.zeros((self.K, self.batch_size, *self.action_space.shape)).to(self.device)
+        # for i in range(0, self.K):
+        #     actions = self.actor.action_dist.actions_from_params(mu_mean, log_std, deterministic=False, **{})
+        #     inner_actions[i] = actions
+
+        # outer_states = outer_states.view(K * self.batch_size, *self.observation_space.shape)
+        # inner_actions = inner_actions.view(self.K * self.batch_size, *self.action_space.shape)
+
+        # print(f"Sample inner actions: {time.time() - st}")
+        # times.append(time.time() - st)
+        # st = time.time()
+
+        model_inp = th.concat((states, inner_actions), dim=1).type(th.float32)
 
         inner_mu_next, inner_logvar_next = self.world_model(model_inp)
 
-        inner_mu_next = inner_mu_next.view(self.K, self.batch_size, *self.observation_space.shape).mean(dim=0).repeat((self.K, 1))
-        inner_logvar_next = inner_logvar_next.view(self.K, self.batch_size, *self.observation_space.shape).mean(dim=0).repeat((self.K, 1))
+        inner_mu_next = inner_mu_next.view(self.batch_size, self.K, -1).mean(dim=1)
+        inner_logvar_next = inner_logvar_next.view(self.batch_size, self.K, -1).mean(dim=1) 
+
+        # inner_mu_next = inner_mu_next.view(self.K, self.batch_size, *self.observation_space.shape).mean(dim=0)
+        # inner_logvar_next = inner_logvar_next.view(self.K, self.batch_size, *self.observation_space.shape).mean(dim=0)
+
+        # print(f"Sample inner next states: {time.time() - st}")
+        # times.append(time.time() - st)
+        # st = time.time()
 
         # print(inner_log_std_next[:, 0])
         # print(outer_log_std_next[:, 0])
@@ -483,12 +518,17 @@ class SAC(OffPolicyAlgorithm):
         # print(f"outer_mu_next: {outer_mu_next.shape}")
         # print(f"inner_std_next: {inner_log_std_next.shape}")
         # print(f"outer_next: {outer_log_std_next.shape}")
-        kls = kl_div(outer_mu_next, outer_logvar_next.exp(), inner_mu_next, inner_logvar_next.exp())
+        kls = kl_div(outer_mu_next, outer_logvar_next.exp(), inner_mu_next[:, None], inner_logvar_next.exp()[:, None])
         kls = th.clip(kls, min=0)
-        kls = kls.view(self.K, self.batch_size)
+        # kls = kls.view(self.K, self.batch_size)
         # print(f"kls: {kls.shape}")
 
-        cai = th.mean(kls, dim=0)
+        cai = th.mean(kls, dim=1)
+
+        # print(f"Calc CAI: {time.time() - st}")
+        # times.append(time.time() - st)
+        # st = time.time()
+
         # print(cai.shape)
         # all_kls[:, j] = kls
 
@@ -508,13 +548,22 @@ class SAC(OffPolicyAlgorithm):
         # self.logger.record("train/cai_min", cai.min().detach().cpu().numpy())        
         # self.logger.record("train/cai_max", cai.max().detach().cpu().numpy())        
 
-        info = { 
-            "outer_mu_next": outer_mu_next.mean().mean().detach().cpu().numpy(),
-            "inner_mu_next": inner_mu_next.mean().mean().detach().cpu().numpy(),
-            "outer_log_std_next": outer_logvar_next.mean().mean().detach().cpu().numpy(),
-            "inner_log_std_next": inner_logvar_next.mean().mean().detach().cpu().numpy(),
-        }
+        info = {}
+        # info = { 
+        #     "outer_mu_next": outer_mu_next.mean().mean().detach().cpu().numpy(),
+        #     "inner_mu_next": inner_mu_next.mean().mean().detach().cpu().numpy(),
+        #     "outer_log_std_next": outer_logvar_next.mean().mean().detach().cpu().numpy(),
+        #     "inner_log_std_next": inner_logvar_next.mean().mean().detach().cpu().numpy(),
+        # }
 
+        # print(f"Log info: {time.time() - st}")
+        # times.append(time.time() - st)
+        # st = time.time()
+
+        # print(f"Total time {np.sum(times)}")
+        # # print(f"CAI time percent {cai_time / np.sum(times) * 100}")
+
+        # print("-----------------------------------------------------")
         self.world_model.train()
         return cai, info
 
@@ -557,6 +606,8 @@ class SAC(OffPolicyAlgorithm):
         self.actor.load_state_dict(th.load(f"{self.model_path}/actor.pt", map_location=self.device))
         self.critic.load_state_dict(th.load(f"{self.model_path}/critic.pt", map_location=self.device))
         self.critic_target.load_state_dict(th.load(f"{self.model_path}/critic_target.pt", map_location=self.device))
+
+        return self
 
 
     def _excluded_save_params(self) -> List[str]:

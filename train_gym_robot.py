@@ -109,7 +109,7 @@ def main():
 
         model = algorithm_class(policy_class, 
                                 env, 
-                                verbose=2, 
+                                verbose=0, 
                                 tensorboard_log=f"{experiment_path}/{run.id}",
                                 **cfg.algorithm.args)
         # Setup Callbacks
