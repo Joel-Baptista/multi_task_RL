@@ -8,7 +8,7 @@ record_freq: -1
 env:
   name: "FetchPickAndPlace-v2"
   args:
-    reward_type: "dense"
+    reward_type: "sparse"
     # tasks_to_complete:
     #   - "microwave"
 

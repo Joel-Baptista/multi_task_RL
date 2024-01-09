@@ -1,0 +1,43 @@
+debug: False
+env: "FrankaKitchen-v1"
+project: "Kitchen_MultiTask"
+num_test: 10 
+env:
+  name: "FrankaKitchen-v1"
+  args:
+    render_mode: Null # human - rgb_array
+    tasks_to_complete:
+      # - "bottom burner"
+      # - "top burner"
+      # - "light switch"
+      # - "slide cabinet"
+      - "microwave"
+      # - "kettle"
+
+policy: 
+  name: "MlpPolicy"
+  module: "stable_baselines3.ppo.policies"
+
+algorithm: 
+  name: "PPO"
+  module: "stable_baselines3"
+  args:
+      learning_rate: 0.0003
+      n_steps: 2048
+      batch_size: 64
+      n_epochs: 10
+      gamma: 0.99
+      gae_lambda: 0.95
+      clip_range: 0.2
+      clip_range_vf: Null
+      normalize_advantage: True
+      ent_coef: 0.0
+      vf_coef: 0.5
+      max_grad_norm: 0.5
+      use_sde: False
+      sde_sample_freq: -1
+      target_kl: Null
+      stats_window_size: 100
+      seed: Null
+      device: "cuda:1"
+
