@@ -149,7 +149,7 @@ def main():
     env.close()
 
     print(f"Overall mean episode reward: {np.mean(scores)}")
-    print(f"Finished episodes percenteage: {finished / cfg.num_test * 100} %")
+    print(f"Finished episodes percentage: {finished / cfg.num_test * 100} %")
    
 if __name__ == '__main__':
     main() 

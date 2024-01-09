@@ -46,3 +46,20 @@ class GOAL_CONDITIONED_WRAP(ObservationWrapper):
             else:
                 result.extend(list(obs[key]))
         return result
+
+
+    def filter_obs(self, obs: dict, tasks) -> np.array:
+        observations = []
+        for i in range(0, len(obs['observation'])):
+            observation = []
+            # print(obs['observation'][i])
+            observation.extend(obs['observation'][i])
+            for task in tasks:
+                # print(obs['desired_goal'][task][i])
+                observation.extend(obs['desired_goal'][task][i])
+                # print(obs['achieved_goal'][task][i])
+                observation.extend(obs['achieved_goal'][task][i])
+
+            observations.append(observation)
+        # print(observations)
+        return np.array(observations)
