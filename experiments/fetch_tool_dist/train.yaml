@@ -19,38 +19,27 @@ env:
     max_episode_steps: 100
   wraps:
     - wrap:
-        name: "reward_wrap"
+        name: "tool_distance"
         module: "wraps.reward"
     - wrap:
         name: "goal_conditioned_wrap"
         module: "wraps.observation"
-
 policy: 
-  name: "MlpPolicy"
-  module: "stable_baselines3.ppo.policies"
+  name: "SACPolicy"
+  module: "stable_baselines3.sac.policies"
 
 algorithm: 
-  name: "PPO"
+  name: "SAC"
   module: "stable_baselines3"
   args:
       learning_rate: 0.0003
-      n_steps: 2048
-      batch_size: 256
-      n_epochs: 10
+      buffer_size: 1_000_000
+      learning_starts: 100
+      batch_size: 512
+      tau: 0.005
       gamma: 0.99
-      gae_lambda: 0.95
-      clip_range: 0.2
-      clip_range_vf: Null
-      normalize_advantage: True
-      ent_coef: 0.0
-      vf_coef: 0.5
-      max_grad_norm: 0.5
-      use_sde: False
-      sde_sample_freq: -1
-      target_kl: Null
-      stats_window_size: 100
+      train_freq: 1
+      gradient_steps: 2
+      action_noise: Null
       seed: Null
       device: "cuda:1"
-      policy_kwargs:
-        net_arch: [512, 256, 256]
-

@@ -22,6 +22,7 @@ class MLP(nn.Module):
                  lr=0.0001,
                  hidden_activation=nn.ReLU,
                  dropout=0.0,
+                 weight_decay=0.0,
                  outp_layer=nn.Linear,
                  outp_activation=nn.Identity,
                  outp_scaling=1.0,
@@ -88,7 +89,7 @@ class MLP(nn.Module):
 
         self.init()
 
-        self.optim = torch.optim.Adam(self.parameters(), lr=lr)
+        self.optim = torch.optim.Adam(self.parameters(), lr=lr, weight_decay=weight_decay)
 
     def init(self):
         for module in self.modules():

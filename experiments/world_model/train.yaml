@@ -43,5 +43,5 @@ algorithm:
       module: "models.world_model"
       path: Null
       args:
-        hidden_dims: [4048, 2012, 512, 206]
+        hidden_dims: [4096, 4096, 4096, 4096, 4096, 2048, 1024, 512]
         hidden_activation: "ReLU"

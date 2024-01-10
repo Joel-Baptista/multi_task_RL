@@ -52,8 +52,6 @@ def main():
     
     experiment_path += args['identifier']
 
-    if args["best"]: experiment_path += "/best_model"
-
     print(experiment_path)
     with open(cfg_path) as f:
         cfg = DotDict(yaml.load(f, Loader=yaml.loader.SafeLoader))
@@ -88,7 +86,7 @@ def main():
                             verbose=1,
                             **cfg.algorithm.args)
     
-
+    if args["best"]: experiment_path += "/best_model"
     files = os.listdir(experiment_path)
 
     is_single_model = False
@@ -105,8 +103,12 @@ def main():
                 print(f"successes: {evaluations['successes']}")
 
                 experiment_path += "/best_model.zip"
+                break
             else:
                 experiment_path += "/model.zip"
+                break
+
+            
 
     print(experiment_path)
     model = model.load(experiment_path)
@@ -128,7 +130,7 @@ def main():
         st = time.time()
         # print(obs)
         action, _state = model.predict(obs, deterministic=True)
-        # print(action)
+        print(action)
 
         observation, reward, terminated, truncated, info = env.step(action)
 

@@ -19,7 +19,7 @@ env:
     max_episode_steps: 100
   wraps:
     - wrap:
-        name: "reward_wrap"
+        name: "tool_distance"
         module: "wraps.reward"
     - wrap:
         name: "goal_conditioned_wrap"

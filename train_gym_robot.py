@@ -108,8 +108,7 @@ def main():
     else:
         model = algorithm_class(policy_class, 
                                 env, 
-                                verbose=1,
-                                model_path=experiment_path, 
+                                verbose=1, 
                                 **cfg.algorithm.args)
         print(model.policy)
         for i in tqdm(range(0, cfg.checkpoints)): 

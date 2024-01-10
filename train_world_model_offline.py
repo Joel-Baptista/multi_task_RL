@@ -22,10 +22,11 @@ DATASETS = ["fetch-dataset-v0"]
 DEGUB = False
 experiment_path = f'{os.getenv("PHD_MODELS")}/fetch_world_model'  
 args = {
-    "epochs": 1000,
-    "hidden_dims": [4048, 2012, 512, 206],
+    "epochs": 1_000,
+    "hidden_dims": [4096, 4096, 4096, 4096, 4096, 2048, 1024, 512],
     "hidden_activation": "ReLU",
-    "dropout": 0.1,
+    "dropout": 0.2,
+    "weight_decay" :1e-5
 }
 
 if os.path.exists(experiment_path):
@@ -85,7 +86,7 @@ if not DEGUB:
         # Track hyperparameters and run metadata
         config=args,
     )
-
+print(run.config)
 full_dataset = None
 for dataset_name in DATASETS:
     try:
@@ -121,7 +122,8 @@ world_model = class_from_str(f"models.world_model.mlp", "mlp".upper())(
         outp_dim = env.observation_space.shape[0], 
         hidden_dims = args["hidden_dims"],
         hidden_activation = class_from_str("torch.nn", args["hidden_activation"]),
-        dropout = args["dropout"]
+        dropout = args["dropout"],
+        weight_decay = args["weight_decay"]
         )
 world_model.to(device)
 print(world_model)
