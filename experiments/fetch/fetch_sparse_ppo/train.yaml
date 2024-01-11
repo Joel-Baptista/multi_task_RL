@@ -16,7 +16,7 @@ env:
     # remove_task_when_completed: True
     # object_noise_ratio: 0.0005
     # robot_noise_ratio: 0.01
-    max_episode_steps: 100
+    max_episode_steps: 50
   wraps:
     - wrap:
         name: "reward_wrap"

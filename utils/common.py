@@ -74,12 +74,12 @@ def class_from_str(module, class_type):
     assert callable(model_class)
     return model_class
 
-def setup_experiment(args: dict) -> dict:
-    
+def setup_experiment(args: dict, file: str = "train.yaml") -> dict:
+
     if args["experiment_name"] is None:
         args["experiment_name"] = "baseline"
         print(f"{Fore.YELLOW}Missing input 'experiment_name'. Assumed to be 'baseline'{Fore.RESET}")
-    
+
     overwrite = args['overwrite']
     experiment_name = args['experiment_name']
     experiment_path = f'{os.getenv("PHD_MODELS")}/{experiment_name}{args["identifier"]}'    
@@ -87,7 +87,15 @@ def setup_experiment(args: dict) -> dict:
     # load train config.
     PHD_ROOT = os.getenv("PHD_ROOT")
     sys.path.append(PHD_ROOT)
-    cfg_path = f"{PHD_ROOT}/multi_task_RL/experiments/{experiment_name}/train.yaml"
+
+    experiment_base = None
+    for folder in os.listdir(f"{PHD_ROOT}/multi_task_RL/experiments/"):
+        print(folder)
+        for experiment in os.listdir(f"{PHD_ROOT}/multi_task_RL/experiments/{folder}"):
+            if experiment == experiment_name: experiment_base = folder
+        if folder is not None: break 
+    
+    cfg_path = f"{PHD_ROOT}/multi_task_RL/experiments/{experiment_base}/{experiment_name}/{file}"
     with open(cfg_path) as f:
         cfg = DotDict(yaml.load(f, Loader=yaml.loader.SafeLoader))
     
@@ -107,3 +115,38 @@ def setup_experiment(args: dict) -> dict:
         shutil.copy(cfg_path, f"{experiment_path}/train.yaml")
     
     return experiment_name, experiment_path, cfg
+
+def setup_test(args: dict) -> dict:
+
+    if args["experiment_name"] is None:
+        args["experiment_name"] = "baseline"
+        print(f"{Fore.YELLOW}Missing input 'experiment_name'. Assumed to be 'baseline'{Fore.RESET}")
+
+    experiment_name = args['experiment_name']
+    experiment_path = f'{os.getenv("PHD_MODELS")}/{experiment_name}'    
+
+    # load train config.
+    PHD_ROOT = os.getenv("PHD_ROOT")
+    sys.path.append(PHD_ROOT)
+
+    experiment_base = None
+    for folder in os.listdir(f"{PHD_ROOT}/multi_task_RL/experiments/"):
+        print(folder)
+        for experiment in os.listdir(f"{PHD_ROOT}/multi_task_RL/experiments/{folder}"):
+            if experiment == experiment_name: experiment_base = folder
+        if folder is not None: break 
+
+
+    cfg_path = f"{PHD_ROOT}/multi_task_RL/experiments/{experiment_base}/{experiment_name}/test.yaml"
+    log_path = f'{os.getenv("PHD_MODELS")}/{experiment_name}{args["identifier"]}'
+    
+    experiment_path += args['identifier']
+
+    print(experiment_path)
+    with open(cfg_path) as f:
+        cfg = DotDict(yaml.load(f, Loader=yaml.loader.SafeLoader))
+
+    if not os.path.exists(experiment_path):
+        raise Exception(f"Results from experiment '{experiment_name}' does not exist in path: {experiment_path}")
+    
+    return log_path, experiment_path, cfg

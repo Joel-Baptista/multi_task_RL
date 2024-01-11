@@ -9,7 +9,7 @@ env:
   name: "FetchPickAndPlace-v2"
   args:
     reward_type: "sparse"
-    max_episode_steps: 100
+    max_episode_steps: 50
   wraps:
     - wrap:
         name: "reward_wrap"

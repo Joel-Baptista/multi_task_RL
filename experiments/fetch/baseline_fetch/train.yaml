@@ -1,14 +1,14 @@
 project: "Fetch_MultiTask"
 total_timesteps: 10_000_000
-checkpoints: 2_000
-eval_freq: 2_000
+checkpoints: 1_000
+eval_freq: 500
 record_freq: -1
 # record_freq: 100_000
 
 env:
   name: "FetchPickAndPlace-v2"
   args:
-    reward_type: "dense"
+    reward_type: "sparse"
     # tasks_to_complete:
     #   - "microwave"
 
@@ -16,10 +16,10 @@ env:
     # remove_task_when_completed: True
     # object_noise_ratio: 0.0005
     # robot_noise_ratio: 0.01
-    max_episode_steps: 100
+    max_episode_steps: 50
   wraps:
     - wrap:
-        name: "tool_distance"
+        name: "reward_wrap"
         module: "wraps.reward"
     - wrap:
         name: "goal_conditioned_wrap"
@@ -42,4 +42,4 @@ algorithm:
       gradient_steps: 2
       action_noise: Null
       seed: Null
-      device: "cuda:1"
+      device: "cuda:0"
