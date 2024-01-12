@@ -12,7 +12,7 @@ env:
     # remove_task_when_completed: True
     # object_noise_ratio: 0.0005
     # robot_noise_ratio: 0.01
-    max_episode_steps: 100
+    max_episode_steps: 50
   wraps:
     - wrap:
         name: "reward_wrap"
@@ -37,26 +37,28 @@ algorithm:
       batch_size: 256
       tau: 0.005
       gamma: 0.99
-      K: 32
+      K: 64
       train_freq: 1
       gradient_steps: 1
       lambda_cai: 0.2
-      cai_clip: 100
-      world_steps_to_train: 100 #-1 to not train
-      world_num_updates: 10
-      world_batch_size: 512
+      cai_clip: Null
+      world_steps_to_train: -1 #-1 to not train 
+      world_num_updates: 20
+      world_batch_size: 1024
       ent_coef: auto # Number for fixed, "auto" for learned
       action_noise: Null
       seed: Null
-      device: "cuda:0"
+      device: "cuda:1"
       model_path: Null
+      stats_window_size: 1_000
       world_model:
         name: "mlp"
         module: "models.world_model"
-        pretrained: False
-        path: Null
+        pretrained: True
+        path: "fetch_world_model"
+        partial_obs: [0, 25] #can be Null for full observation
         args:
-          hidden_dims: [4048, 2012, 512, 206]
+          hidden_dims: [4096, 4096, 4096, 4096, 4096, 2048, 1024, 512]
           hidden_activation: "ReLU"
       policy_kwargs:
         net_arch: [512, 256, 256]

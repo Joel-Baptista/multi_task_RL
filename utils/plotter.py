@@ -11,7 +11,7 @@ csv_file_path = "~/PhD/results/logs/ppo.csv"
 data = pd.read_csv(csv_file_path)
 
 
-key_word_exclude = ["MIN", "MAX", "cai", "baseline", "sparse","dense", "SAC"]
+key_word_exclude = ["MIN", "MAX", "cai", "dense","sparse", "baseline", "PPO"]
 key_word_must = []
 possible_lables = ["Sparse", "Dense", "Tool_dist"]
 # filtered_columns = [col for col in data.columns if "SAC" in col]
@@ -33,7 +33,7 @@ print(filtered_columns)
 
 # Create a line plot for each column
 sns.set(style="whitegrid")  # Set the style of the plot
-plt.figure(figsize=(10, 6))  # Set the figure size
+plt.figure(figsize=(7, 6))  # Set the figure size
 
 # Iterate through each column and plot the line
 counter = 0
@@ -56,12 +56,12 @@ for column in filtered_data.columns:
         step = 20 * data["Step"] // 2
     else:
         step = data["Step"]
-    if "SAC" in column: y_scale = 100
+    # if "SAC" in column: y_scale = 100
 
     counter += 1
     sns.lineplot(x= step, y=data[column] / y_scale, label=f"Run {counter}")
 
-plt.axhline(y=-5, c="r") 
+plt.axhline(y=-5, c="r", label="Success") 
 
 plt.ylim(-110, 0)  # Adjust the y-axis limits as needed
 plt.title('3 Runs - PPO with Dense + Tool Dist function')

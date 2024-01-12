@@ -178,6 +178,12 @@ class SAC(OffPolicyAlgorithm):
         self.model_path = model_path
         self.lambda_cai = lambda_cai
         self.cai_clip = cai_clip
+        
+
+        if "partial_obs" in world_model.keys():
+            self.partial_obs = world_model["partial_obs"]
+        else:
+            self.partial_obs = None
 
         if _init_setup_model:
             self._setup_model()
@@ -185,9 +191,19 @@ class SAC(OffPolicyAlgorithm):
         # JB's
         # aux = class_from_str(f"{world_model['module']}.{world_model['name']}", world_model['name'].upper())
         # print(aux)
+        print(env.action_space.shape[0])
+        print(env.observation_space.shape[0])
+
+        if self.partial_obs is None:
+            obs_shape = env.observation_space.shape[0]
+        else:
+            obs_shape = self.partial_obs[1] - self.partial_obs[0]
+
+        print(obs_shape)
+        print(self.partial_obs)
         self.world_model = class_from_str(f"{world_model['module']}.{world_model['name']}", world_model['name'].upper())(
-            inp_dim = env.action_space.shape[0] + env.observation_space.shape[0], 
-            outp_dim = env.observation_space.shape[0], 
+            inp_dim = env.action_space.shape[0] + obs_shape, 
+            outp_dim = obs_shape, 
             **world_model['args']
             )
         # print(f"For Entropy: {float(-np.prod(self.env.action_space.shape).astype(np.float32))}")
@@ -196,6 +212,7 @@ class SAC(OffPolicyAlgorithm):
                 th.load(f"{MODELS}/{world_model['path']}/world_model.pt",
                                                       map_location=self.device))
 
+        print(self.device)
         self.world_model.to(self.device)
         print(self.world_model)
 
@@ -271,11 +288,20 @@ class SAC(OffPolicyAlgorithm):
                 for _ in range(0, self.world_num_updates):
                     world_data = self.replay_buffer.sample(self.world_batch_size, env=self._vec_normalize_env)
 
-                    model_inp = th.concat((world_data.observations, world_data.actions), dim=1).type(th.float32)
+
+                    if self.partial_obs is None:
+                        obs = world_data.observations
+                        obs_next = world_data.next_observations
+                    else:
+                        obs = world_data.observations[self.partial_obs[0]:self.partial_obs[1]]
+                        obs_next = world_data.next_observations[self.partial_obs[0]:self.partial_obs[1]]
+                        
+
+                    model_inp = th.concat((obs, world_data.actions), dim=1).type(th.float32)
 
                     mu_next, log_std_next = self.world_model(model_inp)
 
-                    model_loss = self.world_model.calc_loss(mu_next, log_std_next, world_data.next_observations.type(th.float32))
+                    model_loss = self.world_model.calc_loss(mu_next, log_std_next, obs_next.type(th.float32))
 
                     self.world_model.optim.zero_grad()
                     model_loss.backward()
@@ -337,7 +363,12 @@ class SAC(OffPolicyAlgorithm):
                 # times.append(time.time() - st)
                 # st = time.time()
 
-                cai, info = self.calc_causal_influence(replay_data.observations)
+                if self.partial_obs is None:
+                    obs = replay_data.observations
+                else:
+                    obs = replay_data.observations[:,self.partial_obs[0]:self.partial_obs[1]]
+
+                cai, info = self.calc_causal_influence(obs)
                 cai = cai.unsqueeze(1)
                 # cai2 = self.calc_causal_influence_2(replay_data.observations).unsqueeze(1)
                 # cai =  cai * 10 ** (-6)
@@ -588,7 +619,7 @@ class SAC(OffPolicyAlgorithm):
         path = self.model_path
 
         if "best_model" in local_path:
-            path = local_path
+            path = f"{self.model_path}/best_model"
 
         if self.model_path is None:
             print(f"Model path is {self.model_path}. Saving was not performed")

@@ -42,4 +42,5 @@ algorithm:
       gradient_steps: 2
       action_noise: Null
       seed: Null
+      stats_window_size: 1_000
       device: "cuda:0"

@@ -48,7 +48,7 @@ algorithm:
       use_sde: False
       sde_sample_freq: -1
       target_kl: Null
-      stats_window_size: 100
+      stats_window_size: 1_000
       seed: Null
       device: "cuda:1"
       policy_kwargs:
