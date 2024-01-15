@@ -293,9 +293,8 @@ class SAC(OffPolicyAlgorithm):
                         obs = world_data.observations
                         obs_next = world_data.next_observations
                     else:
-                        obs = world_data.observations[self.partial_obs[0]:self.partial_obs[1]]
-                        obs_next = world_data.next_observations[self.partial_obs[0]:self.partial_obs[1]]
-                        
+                        obs = world_data.observations[:,self.partial_obs[0]:self.partial_obs[1]]
+                        obs_next = world_data.next_observations[:,self.partial_obs[0]:self.partial_obs[1]]
 
                     model_inp = th.concat((obs, world_data.actions), dim=1).type(th.float32)
 

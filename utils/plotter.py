@@ -7,7 +7,7 @@ import os
 # Load your CSV file
 PHD_ROOT = os.getenv("PHD_ROOT")
 sys.path.append(PHD_ROOT)
-csv_file_path = "~/PhD/results/logs/ppo.csv"
+csv_file_path = "~/PhD/results/logs/fetch_baselines.csv"
 data = pd.read_csv(csv_file_path)
 
 
@@ -23,7 +23,7 @@ for col in data.columns:
     if all(musts) and not any(excludes): filtered_columns.append(col)
 
 # Set the smoothing factor
-smoothing_factor = 10 # Adjust this value according to your preference
+smoothing_factor = 100 # Adjust this value according to your preference
 
 # Apply average smoothing to each column
 smoothed_data = data.rolling(window=smoothing_factor).mean()
@@ -64,7 +64,7 @@ for column in filtered_data.columns:
 plt.axhline(y=-5, c="r", label="Success") 
 
 plt.ylim(-110, 0)  # Adjust the y-axis limits as needed
-plt.title('3 Runs - PPO with Dense + Tool Dist function')
+plt.title('3 Runs - SAC with Dense + Tool Dist function')
 plt.xlabel('Num Episodes')
 plt.ylabel('Mean Episode Reward')
 plt.legend()  # Show legend with column names

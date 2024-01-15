@@ -9,9 +9,8 @@ local_datasets = minari.list_local_datasets()
 if dataset_id in local_datasets:
     minari.delete_dataset(dataset_id)
 
-env=gym.make("FetchPickAndPlace-v2", reward_type="sparse", max_episode_steps=100)
+env=gym.make("FetchPickAndPlace-v2", reward_type="sparse", max_episode_steps=50)
 env = minari.DataCollectorV0(env=env, record_infos=True)
-
 
 env.reset()
 

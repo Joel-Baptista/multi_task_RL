@@ -20,13 +20,14 @@ TASKS = ['microwave']
 # DATASETS = ["kitchen-complete-v1", "kitchen-mixed-v1", "kitchen-partial-v1"]
 DATASETS = ["fetch-dataset-v0"]
 DEGUB = False
-experiment_path = f'{os.getenv("PHD_MODELS")}/fetch_world_model'  
+experiment_path = f'{os.getenv("PHD_MODELS")}/fetch_world_model_fixed'  
 args = {
     "epochs": 1_000,
     "hidden_dims": [4096, 4096, 4096, 4096, 4096, 2048, 1024, 512],
     "hidden_activation": "ReLU",
     "dropout": 0.2,
-    "weight_decay" :1e-5
+    "weight_decay" :1e-5,
+    "std": 0.1, # "auto" for adaptable; number for fixed
 }
 
 if os.path.exists(experiment_path):
@@ -123,7 +124,9 @@ world_model = class_from_str(f"models.world_model.mlp", "mlp".upper())(
         hidden_dims = args["hidden_dims"],
         hidden_activation = class_from_str("torch.nn", args["hidden_activation"]),
         dropout = args["dropout"],
-        weight_decay = args["weight_decay"]
+        weight_decay = args["weight_decay"],
+        std = args["std"],
+        device = device
         )
 world_model.to(device)
 print(world_model)

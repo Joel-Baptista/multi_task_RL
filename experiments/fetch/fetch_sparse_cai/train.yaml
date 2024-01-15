@@ -40,8 +40,8 @@ algorithm:
       gradient_steps: 1
       lambda_cai: 0.2
       cai_clip: Null
-      world_steps_to_train: -1 #-1 to not train 
-      world_num_updates: 20
+      world_steps_to_train: 1_000 #-1 to not train 
+      world_num_updates: 5
       world_batch_size: 1024
       ent_coef: auto # Number for fixed, "auto" for learned
       action_noise: Null
@@ -52,12 +52,15 @@ algorithm:
       world_model:
         name: "mlp"
         module: "models.world_model"
-        pretrained: False
+        pretrained: True
         path: "fetch_world_model"
         partial_obs: [0, 25] #can be Null for full observation
         args:
           hidden_dims: [4096, 4096, 4096, 4096, 4096, 2048, 1024, 512]
           hidden_activation: "ReLU"
+          dropout: 0.2
+          weight_decay: 0.00001
+          std: 0.1 # "auto" for adaptable; number for fixed
       policy_kwargs:
         net_arch: [512, 256, 256]
 
