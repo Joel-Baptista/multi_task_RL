@@ -23,6 +23,8 @@ class MLP(nn.Module):
                  hidden_activation=nn.ReLU,
                  dropout=0.0,
                  weight_decay=0.0,
+                 std: str | float = "auto",
+                 device: str = "cpu",
                  outp_layer=nn.Linear,
                  outp_activation=nn.Identity,
                  outp_scaling=1.0,
@@ -37,6 +39,7 @@ class MLP(nn.Module):
                  legacy_bn_first=True,
                  add_bn_input=False):
         super().__init__()
+        self.outp_dim = outp_dim
         self.w_init = weight_init
         self.b_init = bias_init
         self.w_init_last = weight_init_last
@@ -45,6 +48,13 @@ class MLP(nn.Module):
         self.add_bn_input = add_bn_input
         self.reparam_noise = 1e-6 # JB's
         self.dropout = dropout
+        self.std = std
+        self.fixed_log_std = None
+        self.device = device
+
+        if isinstance(std, float):
+            self.fixed_log_std = torch.log(torch.tensor(self.std)).to(device)
+
         if add_bn_input:
             assert not legacy_bn_first
 
@@ -117,8 +127,12 @@ class MLP(nn.Module):
         x = self.drop_layer(x)
         mu = self.mu(x)
         # log_std = torch.sigmoid(self.log_std(x))
-        log_std = self.log_std(x)
-        log_std = torch.clamp(log_std, min=LOG_STD_MIN, max=LOG_STD_MAX) 
+
+        if self.std == "auto":
+            log_std = self.log_std(x)
+            log_std = torch.clamp(log_std, min=LOG_STD_MIN, max=LOG_STD_MAX) 
+        else:
+            log_std = torch.ones(self.outp_dim).to(self.device) * self.fixed_log_std
 
         if self.outp_scaling != 1:
             mu = self.outp_scaling * mu
