@@ -199,8 +199,7 @@ class SAC(OffPolicyAlgorithm):
         else:
             obs_shape = self.partial_obs[1] - self.partial_obs[0]
 
-        print(obs_shape)
-        print(self.partial_obs)
+        world_model['args']['device'] = self.device
         self.world_model = class_from_str(f"{world_model['module']}.{world_model['name']}", world_model['name'].upper())(
             inp_dim = env.action_space.shape[0] + obs_shape, 
             outp_dim = obs_shape, 
@@ -618,6 +617,7 @@ class SAC(OffPolicyAlgorithm):
         path = self.model_path
 
         if "best_model" in local_path:
+            print(path)
             path = f"{self.model_path}/best_model"
 
         if self.model_path is None:
@@ -629,13 +629,18 @@ class SAC(OffPolicyAlgorithm):
             th.save(self.critic.state_dict(), f"{path}/critic.pt")
             th.save(self.critic_target.state_dict(), f"{path}/critic_target.pt")
 
-    def load(self, _):
+    def load(self, local_path: str = ""):
+
+        path = self.model_path
+
+        if "best_model" in local_path:
+            path = f"{self.model_path}/best_model"
 
         print("-------------LOADING MODELS-------------------------")
-        self.world_model.load_state_dict(th.load(f"{self.model_path}/world_model.pt", map_location=self.device))
-        self.actor.load_state_dict(th.load(f"{self.model_path}/actor.pt", map_location=self.device))
-        self.critic.load_state_dict(th.load(f"{self.model_path}/critic.pt", map_location=self.device))
-        self.critic_target.load_state_dict(th.load(f"{self.model_path}/critic_target.pt", map_location=self.device))
+        self.world_model.load_state_dict(th.load(f"{path}/world_model.pt", map_location=self.device))
+        self.actor.load_state_dict(th.load(f"{path}/actor.pt", map_location=self.device))
+        self.critic.load_state_dict(th.load(f"{path}/critic.pt", map_location=self.device))
+        self.critic_target.load_state_dict(th.load(f"{path}/critic_target.pt", map_location=self.device))
 
         return self
 

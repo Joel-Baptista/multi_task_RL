@@ -132,7 +132,7 @@ class MLP(nn.Module):
             log_std = self.log_std(x)
             log_std = torch.clamp(log_std, min=LOG_STD_MIN, max=LOG_STD_MAX) 
         else:
-            log_std = torch.ones(self.outp_dim).to(self.device) * self.fixed_log_std
+            log_std = torch.ones((inp.shape[0], self.outp_dim)).to(self.device) * self.fixed_log_std
 
         if self.outp_scaling != 1:
             mu = self.outp_scaling * mu

@@ -51,7 +51,8 @@ algorithm:
       stats_window_size: 100
       seed: Null
       stats_window_size: 1_000
-      device: "cuda:1"
+      device: "cuda:0"
       policy_kwargs:
         net_arch: [512, 256, 256]
+        log_std_init: 0.5
 

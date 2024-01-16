@@ -55,7 +55,7 @@ algorithm:
         name: "mlp"
         module: "models.world_model"
         pretrained: True
-        path: "fetch_world_model"
+        path: "fetch_world_model_fixed"
         partial_obs: [0, 25] #can be Null for full observation
         args:
           hidden_dims: [4096, 4096, 4096, 4096, 4096, 2048, 1024, 512]

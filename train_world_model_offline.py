@@ -12,6 +12,7 @@ import math
 import wandb
 import os
 import shutil
+import time
 
 from utils.common import DotDict, model_class_from_str, class_from_str
 from wraps.observation.observation_wrap import OBSERVATION_WRAP
@@ -140,7 +141,7 @@ for epoch in range(0, args["epochs"]):
     print(f"Epoch {epoch + 1}")
     world_model_losses = []
     world_model_val_losses = []
-
+    st = time.time()
     world_model.train()
     for batch in tqdm(train_loader):
 
@@ -182,6 +183,7 @@ for epoch in range(0, args["epochs"]):
               "train/avg_val_loss": mean_val_loss,
               "train/log_std_mean":  np.array(log_std_list).mean(),
               "train/mu_mean":  np.array(mu_list).mean(),
+              "time/time_per_epoch": (time.time() - st) / 60, 
               })
     
     if mean_val_loss < min_val_loss:
