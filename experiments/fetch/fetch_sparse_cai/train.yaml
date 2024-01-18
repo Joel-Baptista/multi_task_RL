@@ -60,7 +60,7 @@ algorithm:
           hidden_activation: "ReLU"
           dropout: 0.2
           weight_decay: 0.00001
-          std: 0.01 # "auto" for adaptable; number for fixed
+          std: 0.1 # "auto" for adaptable; number for fixed
       policy_kwargs:
         net_arch: [512, 256, 256]
 

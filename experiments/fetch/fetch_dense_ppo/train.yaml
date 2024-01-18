@@ -1,5 +1,5 @@
 project: "Fetch_MultiTask"
-total_timesteps: 10_000_000
+total_timesteps: 1_000_000
 checkpoints: 2_000
 eval_freq: 2_000
 record_freq: -1
@@ -42,17 +42,16 @@ algorithm:
       clip_range: 0.2
       clip_range_vf: Null
       normalize_advantage: True
-      ent_coef: 0.01
+      ent_coef: 0.0
       vf_coef: 0.5
       max_grad_norm: 0.5
       use_sde: False
       sde_sample_freq: -1
       target_kl: Null
-      stats_window_size: 100
       seed: Null
       stats_window_size: 1_000
       device: "cuda:0"
       policy_kwargs:
         net_arch: [512, 256, 256]
-        log_std_init: 0.5
+        log_std_init: 5
 
