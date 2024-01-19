@@ -258,7 +258,6 @@ class SAC(OffPolicyAlgorithm):
     def train(self, gradient_steps: int, batch_size: int = 64) -> None:
         
         # st = time.time()
-        # times = []
 
         # Switch to train mode (this affects batch norm / dropout)
         self.policy.set_training_mode(True)
@@ -272,6 +271,9 @@ class SAC(OffPolicyAlgorithm):
 
         ent_coef_losses, ent_coefs = [], []
         actor_losses, critic_losses, world_model_losses = [], [], []
+        critic_eval = []
+
+        sample_time, world_update_time, cai_time, target_time, ac_update_time, train_time =  [], [], [], [], [], []
 
         # print(f"Setup time: {time.time() - st}")
         # times.append(time.time() - st)
@@ -279,12 +281,17 @@ class SAC(OffPolicyAlgorithm):
 
         for gradient_step in range(gradient_steps):
             # Sample replay buffer
+            st = time.time()
+            st_train = time.time()
             replay_data = self.replay_buffer.sample(batch_size, env=self._vec_normalize_env)  # type: ignore[union-attr]
+            sample_time.append(time.time() - st)
+
             if (self._n_updates + gradient_step) % self.world_steps_to_train == 0 \
                 and self.world_steps_to_train > 0:
                 # print("Training world model!!!!")
                 self.world_model.train()
                 for _ in range(0, self.world_num_updates):
+                    st = time.time()
                     world_data = self.replay_buffer.sample(self.world_batch_size, env=self._vec_normalize_env)
 
 
@@ -306,6 +313,7 @@ class SAC(OffPolicyAlgorithm):
                     self.world_model.optim.step()
 
                     world_model_losses.append(model_loss.item())
+                    world_update_time.append(time.time() - st)
                 
                 # print(f"Train World Model time: {time.time() - st}")
                 # times.append(time.time() - st)
@@ -347,12 +355,14 @@ class SAC(OffPolicyAlgorithm):
             # times.append(time.time() - st)
             # st = time.time()
 
+            st = time.time()
             with th.no_grad():
                 # Select action according to policy
                 next_actions, next_log_prob = self.actor.action_log_prob(replay_data.next_observations)
                 # Compute the next Q values: min over all critics targets
                 next_q_values = th.cat(self.critic_target(replay_data.next_observations, next_actions), dim=1)
                 next_q_values, _ = th.min(next_q_values, dim=1, keepdim=True)
+                critic_eval.append(next_q_values.mean().item())
                 # add entropy term
                 next_q_values = next_q_values - ent_coef * next_log_prob.reshape(-1, 1)
                 # td error + entropy term
@@ -366,8 +376,10 @@ class SAC(OffPolicyAlgorithm):
                 else:
                     obs = replay_data.observations[:,self.partial_obs[0]:self.partial_obs[1]]
 
+                st_cai = time.time()
                 cai, info = self.calc_causal_influence(obs)
                 cai = cai.unsqueeze(1)
+                cai_time.append(time.time() - st)
                 # cai2 = self.calc_causal_influence_2(replay_data.observations).unsqueeze(1)
                 # cai =  cai * 10 ** (-6)
                 # print(f"cai: {cai.mean()}")
@@ -375,6 +387,7 @@ class SAC(OffPolicyAlgorithm):
                 if self.cai_clip is not None:
                     cai = th.clip(cai, 0, self.cai_clip)
 
+                cai_time.append(time.time() - st_cai)
                 rewards = replay_data.rewards + self.lambda_cai * cai
                 
                 # print(f"Calc CAI time: {time.time() - st}")
@@ -384,11 +397,14 @@ class SAC(OffPolicyAlgorithm):
 
                 target_q_values = rewards + (1 - replay_data.dones) * self.gamma * next_q_values
 
+            target_time.append(time.time() - st)
             # Get current Q-values estimates for each critic network
             # using action from the replay buffer
+
             current_q_values = self.critic(replay_data.observations, replay_data.actions)
 
             # Compute critic loss
+            st = time.time()
             critic_loss = 0.5 * sum(F.mse_loss(current_q, target_q_values) for current_q in current_q_values)
             assert isinstance(critic_loss, th.Tensor)  # for type checker
             critic_losses.append(critic_loss.item())  # type: ignore[union-attr]
@@ -415,6 +431,7 @@ class SAC(OffPolicyAlgorithm):
             actor_loss.backward()
             self.actor.optimizer.step()
             
+            ac_update_time.append(time.time() - st)
             # print(f"Optimize Actor time: {time.time() - st}")
             # times.append(time.time() - st)
             # st = time.time()
@@ -428,14 +445,21 @@ class SAC(OffPolicyAlgorithm):
                 # times.append(time.time() - st)
                 # st = time.time()
 
+            train_time.append(time.time() - st_train)
+
         self._n_updates += gradient_steps
 
+        st_log = time.time()
         self.logger.record("train/n_updates", self._n_updates, exclude="tensorboard")
         self.logger.record("train/ent_coef", np.mean(ent_coefs))
         self.logger.record("train/actor_loss", np.mean(actor_losses))
         self.logger.record("train/critic_loss", np.mean(critic_losses))
+        self.logger.record("train/critic_eval", np.mean(critic_eval))
         self.logger.record("cai/cai", np.mean(
             cai.squeeze(1).detach().cpu().numpy()
+            ))
+        self.logger.record("cai/cai_and_reward", np.mean(
+            rewards.squeeze(1).detach().cpu().numpy()
             ))
         self.logger.record("cai/cai_min", np.mean(
             cai.squeeze(1).min().detach().cpu().numpy()
@@ -450,6 +474,14 @@ class SAC(OffPolicyAlgorithm):
             self.logger.record("world_model/world_model_loss", np.mean(world_model_losses))
         if len(ent_coef_losses) > 0:
             self.logger.record("train/ent_coef_loss", np.mean(ent_coef_losses))
+
+        self.logger.record("time/sample_time", 1 / np.mean(sample_time))
+        self.logger.record("time/world_update_time", 1 / np.mean(world_update_time))
+        self.logger.record("time/cai_time", 1 / np.mean(cai_time))
+        self.logger.record("time/ac_update_time", 1 / np.mean(ac_update_time))
+        self.logger.record("time/train_time", 1 / np.mean(train_time))
+        
+        self.logger.record("time/log_time", 1 / np.mean(time.time() - st_log))
 
         # print(f"Log time: {time.time() - st}")
         # times.append(time.time() - st)

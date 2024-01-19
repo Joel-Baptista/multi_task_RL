@@ -29,7 +29,7 @@ from callbacks.video_recorder import VideoRecorder
 
 args = {
     "debug": True,
-    "experiment_name": "fetch_dense_ppo",
+    "experiment_name": "fetch_tool_dist_ppo",
     "overwrite": False,
     "identifier": ""
 }
@@ -41,7 +41,7 @@ def main():
     experiment_name, experiment_path, cfg = setup_experiment(args)
  
     run = wandb.init(
-        project=cfg.project, 
+        project=f"{cfg.project}", 
         sync_tensorboard=True,
         name=f"{cfg.algorithm.name}_{experiment_name}"
         )

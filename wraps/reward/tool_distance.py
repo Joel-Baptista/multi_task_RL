@@ -2,6 +2,7 @@ from gymnasium import Env, RewardWrapper
 from typing import SupportsFloat
 from typing import TypeVar
 from typing import Any
+import numpy as np
 
 ActType = TypeVar("ActType")
 ObsType = TypeVar("ObsType")
@@ -33,7 +34,9 @@ class TOOL_DISTANCE(RewardWrapper):
         Returns:
             The modified `reward`
         """
-        print(f"Tool Dist: {sum(abs(observation['observation'][6:9]))}")
-        print(f"Normal Reward: {reward}")
-        print("----------------------------------------------------------")
-        return self.reward_scale * reward - self.tool_weight * sum(abs(observation["observation"][6:9]))
+        # print(f"Tool Dist: {sum(abs(observation['observation'][6:9]))}")
+        # print(f"Normal Reward: {reward}")
+        # print("----------------------------------------------------------")
+
+        
+        return self.reward_scale * reward - self.tool_weight * np.linalg.norm(observation["observation"][6:9])
