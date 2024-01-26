@@ -1,7 +1,6 @@
 import collections
 import itertools
 
-import gin
 import torch 
 from torch import nn
 
@@ -13,7 +12,6 @@ LOG_STD_MAX = 4
 LOG_STD_MIN = -18
 _LOG_2PI = math.log(2 * math.pi)
 
-@gin.configurable(denylist=['inp_dim', 'outp_dim'])
 class MLP(nn.Module):
     def __init__(self,
                  inp_dim,
@@ -165,7 +163,6 @@ class MLP(nn.Module):
 
         return -model_loss.mean()
 
-@gin.configurable(denylist=['inp_dim', 'outp_dim'])
 class FactorizedMLP(MLP):
     """MLP taking factorized inputs"""
     def __init__(self, inp_dim, outp_dim, *args, **kwargs):
@@ -184,8 +181,6 @@ class FactorizedMLP(MLP):
         # Factorizing outputs not supported here yet
         return super().forward(inp)
 
-
-@gin.configurable
 def load_mlp(path, mlp_cls):
     state_dict = torch.load(path, map_location=torch.device('cpu'))
     # TODO: this is kind of an unsafe way to detect the input/output dims
@@ -196,8 +191,6 @@ def load_mlp(path, mlp_cls):
 
     return mlp
 
-
-@gin.configurable(denylist=['model'])
 def get_params_from_mlp(model, param_type):
     if param_type == 'stem':
         return model.layers[:-2].parameters()

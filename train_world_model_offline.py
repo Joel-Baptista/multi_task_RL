@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 
 # from utils.dataloader import collate_fn
+import gymnasium as gym
 from gymnasium import spaces
 from torch.utils.data import DataLoader, random_split, ConcatDataset, Dataset
 import numpy as np
@@ -19,16 +20,16 @@ from wraps.observation.observation_wrap import OBSERVATION_WRAP
 
 TASKS = ['microwave']
 # DATASETS = ["kitchen-complete-v1", "kitchen-mixed-v1", "kitchen-partial-v1"]
-DATASETS = ["fetch-dataset-v0"]
+DATASETS = ["kitchen-dataset-v0"]
 DEGUB = False
-experiment_path = f'{os.getenv("PHD_MODELS")}/fetch_world_model_fixed'  
+experiment_path = f'{os.getenv("PHD_MODELS")}/kitchen_world_model'  
 args = {
-    "epochs": 1_000,
-    "hidden_dims": [4096, 4096, 4096, 4096, 4096, 2048, 1024, 512],
+    "epochs": 10_000,
+    "hidden_dims": [4096, 4096, 4096, 4096, 2048, 1024, 512],
     "hidden_activation": "ReLU",
-    "dropout": 0.2,
+    "dropout": 0.1,
     "weight_decay" :1e-5,
-    "std": 0.1, # "auto" for adaptable; number for fixed
+    "std": "auto", # "auto" for adaptable; number for fixed
 }
 
 if os.path.exists(experiment_path):
@@ -40,12 +41,13 @@ _LOG_2PI = math.log(2 * math.pi)
 # _LOG_2PI = 0
 
 def collate_fn(batch):
-    
+
     batch_tensor = {
         "id": np.array([x.id for x in batch]),
         "seed": np.array([x.seed for x in batch]),
         "total_timesteps": np.array([x.total_timesteps for x in batch]),
-        "observations": [x.observations["observation"] for x in batch],
+        # "observations": [x.observations["observation"] for x in batch],
+        "observations": [x.observations for x in batch],
         "actions": [x.actions for x in batch],
         "rewards": [x.rewards for x in batch],
         "terminations": [x.terminations for x in batch],
@@ -53,10 +55,15 @@ def collate_fn(batch):
     }
     batch_transitions = []
     
+    # states_actions = np.zeros((sum(batch_tensor["total_timesteps"]), 
+    #                           batch[0].observations["observation"].shape[1] + batch[0].actions.shape[1]))
+    # states_next = np.zeros((sum(batch_tensor["total_timesteps"]), 
+    #                           batch[0].observations["observation"].shape[1]))
+
     states_actions = np.zeros((sum(batch_tensor["total_timesteps"]), 
-                              batch[0].observations["observation"].shape[1] + batch[0].actions.shape[1]))
+                              batch[0].observations.shape[1] + batch[0].actions.shape[1]))
     states_next = np.zeros((sum(batch_tensor["total_timesteps"]), 
-                              batch[0].observations["observation"].shape[1]))
+                              batch[0].observations.shape[1]))
 
     count = 0
     for i in range(0, len(batch_tensor["observations"])):
@@ -83,7 +90,7 @@ if not DEGUB:
     wandb.login()
     run = wandb.init(
         # Set the project where this run will be logged
-        project="Fetch_World_Model",
+        project="Kitchen_World_Model",
         name="world_model",
         # Track hyperparameters and run metadata
         config=args,
@@ -116,8 +123,10 @@ val_loader = DataLoader(val_dataset, batch_size=6, num_workers=3, collate_fn=col
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else 'cpu')
 
-env = dataset.recover_environment()
+env=gym.make('FrankaKitchen-v1')
 env = OBSERVATION_WRAP(env)
+# env = dataset.recover_environment()
+# env = OBSERVATION_WRAP(env)
 
 world_model = class_from_str(f"models.world_model.mlp", "mlp".upper())(
         inp_dim = env.action_space.shape[0] + env.observation_space.shape[0], 

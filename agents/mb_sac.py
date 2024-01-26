@@ -622,7 +622,7 @@ class SAC(OffPolicyAlgorithm):
         # st = time.time()
 
         # print(f"Total time {np.sum(times)}")
-        # # print(f"CAI time percent {cai_time / np.sum(times) * 100}")
+        # print(f"CAI time percent {cai_time / np.sum(times) * 100}")
 
         # print("-----------------------------------------------------")
         self.world_model.train()
