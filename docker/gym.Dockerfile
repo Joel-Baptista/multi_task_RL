@@ -14,6 +14,9 @@ COPY requirements.txt /tmp/
 RUN pip install --requirement /tmp/requirements.txt
 RUN pip install wandb -U --pre
 
+COPY test.py /tmp/
+RUN python3 /tmp/test.py
+
 RUN mkdir /usr/local/gymnasium/logs
 RUN mkdir /usr/local/gymnasium/models
 RUN mkdir /usr/local/gymnasium/code

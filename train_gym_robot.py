@@ -37,7 +37,7 @@ def main():
     parser = argparse.ArgumentParser(description='Train asl2text models.')
     parser.add_argument('-en', '--experiment_name', type=str)
     parser.add_argument('-ow', '--overwrite', action='store_true')
-    parser.add_argument('-id', '--identifier', type=str, default='')
+    parser.add_argument('-id', '--identifier', type=str, default='') # if "auto", then auto assigns
     parser.add_argument('-d', '--debug', action='store_true')
 
     arglist = [x for x in sys.argv[1:] if not x.startswith('__')]

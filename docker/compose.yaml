@@ -1,0 +1,22 @@
+version: '3'
+services:
+  gym:
+    image: jbaptista99/gym:0.6
+    environment:
+      - WANDB_API_KEY=${WANDB_API_KEY}
+    command: 
+     - "bash" 
+     - "-c"
+     - ./code/multi_task_RL/docker/train.sh ${EXPERIMENT}
+    runtime: nvidia
+    ipc: host
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    network_mode: host
+    volumes:
+      - /home/joelbaptista/PhD:/usr/local/gymnasium/code
+      - /data/joelbaptista/PhD/logs:/usr/local/gymnasium/logs
+      - /data/joelbaptista/PhD/models:/usr/local/gymnasium/models
+    deploy:
+      replicas: ${TRAIN_REPLICAS}  # Set the desired number of replicas
