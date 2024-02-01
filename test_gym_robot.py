@@ -130,7 +130,6 @@ def main():
         # print(action)
 
         observation, reward, terminated, truncated, info = env.step(action)
-
         score += reward
         obs = observation
         
@@ -141,6 +140,7 @@ def main():
 
             if i >= cfg.num_test: break
 
+            print(obs[28:31])
             print(f"episode: {i} with score {score}")
             score = 0
             obs, info = env.reset()

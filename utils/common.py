@@ -149,12 +149,13 @@ def setup_test(args: dict) -> dict:
             if experiment == experiment_name: experiment_base = folder
         if folder is not None: break 
 
+    identifier = args['identifier']
+    # identifier = f"/{args['identifier']}"
 
     cfg_path = f"{PHD_ROOT}/multi_task_RL/experiments/{experiment_base}/{experiment_name}/test.yaml"
-    log_path = f'{os.getenv("PHD_MODELS")}/{experiment_name}/{args["identifier"]}'
+    log_path = f'{os.getenv("PHD_MODELS")}/{experiment_name}{identifier}'
     
-    # experiment_path += args['identifier']
-    experiment_path += f"/{args['identifier']}"
+    experiment_path += identifier
 
     print(experiment_path)
     with open(cfg_path) as f:
