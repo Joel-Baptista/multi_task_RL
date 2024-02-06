@@ -28,7 +28,7 @@ class GOAL_CONDITIONED_WRAP(ObservationWrapper):
         # print(f"Pre flatten: {observation}")
         # print(f"Post flatten: {self.flatten_obs(observation)[28:32]}")
         obs = self.flatten_obs(observation)
-        obs[-1] = 0.47
+        # obs[-1] = 0.47
         # obs[-1] = 0.42469975
         return np.array(obs)
 

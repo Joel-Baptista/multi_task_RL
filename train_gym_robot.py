@@ -87,7 +87,7 @@ def main():
         # Setup Callbacks
         
         eval_callback = EvalCallback(model.env, best_model_save_path=f'{experiment_path}/best_model',
-                             log_path=f'{experiment_path}', eval_freq=cfg.eval_freq,
+                             log_path=f'{experiment_path}', eval_freq=cfg.eval_freq, n_eval_episodes=10,
                              deterministic=True, render=False)
         wand_callback = WandbCallback(
                 verbose=2,

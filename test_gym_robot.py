@@ -12,6 +12,7 @@ import math
 import numpy as np
 import time
 
+
 # Logs
 import wandb
 from wandb.integration.sb3 import WandbCallback
@@ -112,6 +113,7 @@ def main():
 
     score = 0
     i = 0
+    fps = 30
     
     if args["record"]:
         video = cv.VideoWriter(f"{log_path}/test_video.mp4",
@@ -140,10 +142,13 @@ def main():
 
             if i >= cfg.num_test: break
 
-            print(obs[28:31])
+            # print(obs[28:31])
             print(f"episode: {i} with score {score}")
             score = 0
             obs, info = env.reset()
+
+        while time.time() - st  < (1 / fps) and not args["record"]:
+            continue
 
     env.close()
     if args["record"]: video.release()
