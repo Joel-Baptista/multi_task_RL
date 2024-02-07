@@ -59,9 +59,9 @@ for column in filtered_data.columns:
         if "dense" in column: y_scale = 1
 
     if "PPO" in column:
-        step = 20 * data["Step"] // 2
+        step =  27 * data["Step"] // 2
     else:
-        step = data["Step"]
+        step = data["Step"] 
     # if "SAC" in column: y_scale = 100
         
     if average_data is None:
@@ -74,8 +74,8 @@ for column in filtered_data.columns:
     all_data.append(data[column] / y_scale)
     # sns.lineplot(x= step, y=data[column] / y_scale, label=f"Run {counter}")
 
-plt.plot(step, average_data / counter, color='red', linestyle='-', label='Average Runs')
-plt.fill_between(step, np.min(all_data, axis=0), np.max(all_data, axis=0),
+plt.plot(step, 100 * average_data / counter, color='red', linestyle='-', label='Average Runs')
+plt.fill_between(step, 100 * np.min(all_data, axis=0), 100 * np.max(all_data, axis=0),
                  color='red', alpha=0.2, label='Area containing all runs')
 
 
@@ -84,6 +84,6 @@ plt.fill_between(step, np.min(all_data, axis=0), np.max(all_data, axis=0),
 # plt.ylim(-110, 0)  # Adjust the y-axis limits as needed
 plt.title('PPO with Dense + Tool Dist function')
 plt.xlabel('Num Episodes')
-plt.ylabel('Mean Episode Reward')
+plt.ylabel('Success Rate (%)')
 plt.legend()  # Show legend with column names
 plt.show()
