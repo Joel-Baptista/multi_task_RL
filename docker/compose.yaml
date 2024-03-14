@@ -12,7 +12,7 @@ services:
     ipc: host
     ulimits:
       memlock: -1
-      stack: 67108864
+      stack: 12108864
     network_mode: host
     volumes:
       - /home/joelbaptista/PhD:/usr/local/gymnasium/code
