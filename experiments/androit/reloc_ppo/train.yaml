@@ -1,7 +1,7 @@
 project: "Adroit"
 total_timesteps: 50_000_000
 checkpoints: 1_000
-eval_freq: 500
+eval_freq: 10_000
 # record_freq: -1
 record_freq: 100_000
 
