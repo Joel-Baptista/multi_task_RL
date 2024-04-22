@@ -75,17 +75,20 @@ def class_from_str(module, class_type):
     return model_class
 
 def setup_experiment(args: dict, file: str = "train.yaml") -> dict:
-
+    # Check if experiment_name is provided, otherwise assume it as "baseline"
     if args["experiment_name"] is None:
         args["experiment_name"] = "baseline"
         print(f"{Fore.YELLOW}Missing input 'experiment_name'. Assumed to be 'baseline'{Fore.RESET}")
     
+    # Check if overwrite flag is provided
     overwrite = args['overwrite']
     experiment_name = args['experiment_name']
 
-    if args["identifier"] == "": args["identifier"] = "1"
+    # Check if identifier is provided, otherwise set it as "1"
+    if args["identifier"] == "":
+        args["identifier"] = "1"
     elif args["identifier"] == "auto":
-
+        # Find the latest experiment folder and increment the identifier
         files = os.listdir(f'{os.getenv("PHD_MODELS")}/{experiment_name}')
         folder_experiments = [int(s) for s in files if s.isdigit()]
 
@@ -97,7 +100,7 @@ def setup_experiment(args: dict, file: str = "train.yaml") -> dict:
             
     experiment_path = f'{os.getenv("PHD_MODELS")}/{experiment_name}/{args["identifier"]}'    
 
-    # load train config.
+    # Load train config
     PHD_ROOT = os.getenv("PHD_ROOT")
     sys.path.append(PHD_ROOT)
 
@@ -121,7 +124,7 @@ def setup_experiment(args: dict, file: str = "train.yaml") -> dict:
                 print(f'{experiment_path} already exits. ')
                 raise Exception('Experiment name already exists. If you want to overwrite, use flag -ow')
 
-        # create folder to the results.
+        # Create folder to store the results
         os.makedirs(experiment_path)
         os.makedirs(f"{experiment_path}/best_model")
         print(f"Path create: {experiment_path}") 
@@ -131,12 +134,28 @@ def setup_experiment(args: dict, file: str = "train.yaml") -> dict:
 
 def setup_test(args: dict) -> dict:
 
+    # Check if experiment_name is provided, otherwise assume it as "baseline"
     if args["experiment_name"] is None:
         args["experiment_name"] = "baseline"
         print(f"{Fore.YELLOW}Missing input 'experiment_name'. Assumed to be 'baseline'{Fore.RESET}")
+    
+    # Check if identifier is provided, otherwise set it as "1"
 
     experiment_name = args['experiment_name']
-    experiment_path = f'{os.getenv("PHD_MODELS")}/{experiment_name}'    
+    if args["identifier"] == "":
+        args["identifier"] = "1"
+    elif args["identifier"] == "auto":
+        # Find the latest experiment folder and increment the identifier
+        files = os.listdir(f'{os.getenv("PHD_MODELS")}/{experiment_name}')
+        folder_experiments = [int(s) for s in files if s.isdigit()]
+
+        if len(folder_experiments) == 0:
+            args["identifier"] = 1
+        else:
+            folder_experiments.sort()
+            args["identifier"] = folder_experiments[-1] + 1 
+            
+    experiment_path = f'{os.getenv("PHD_MODELS")}/{experiment_name}/{args["identifier"]}'    
 
     # load train config.
     PHD_ROOT = os.getenv("PHD_ROOT")
@@ -154,8 +173,7 @@ def setup_test(args: dict) -> dict:
 
     cfg_path = f"{PHD_ROOT}/multi_task_RL/experiments/{experiment_base}/{experiment_name}/test.yaml"
     log_path = f'{os.getenv("PHD_MODELS")}/{experiment_name}{identifier}'
-    
-    experiment_path += identifier
+
 
     print(experiment_path)
     with open(cfg_path) as f:
