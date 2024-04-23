@@ -1,7 +1,7 @@
 version: '3'
 services:
   gym:
-    image: jbaptista99/gym:0.6
+    image: jbaptista99/gym:1.0
     environment:
       - WANDB_API_KEY=${WANDB_API_KEY}
     command: 
@@ -15,8 +15,8 @@ services:
       stack: 12108864
     network_mode: host
     volumes:
-      - /home/joelbaptista/PhD:/usr/local/gymnasium/code
-      - /data/joelbaptista/PhD/logs:/usr/local/gymnasium/logs
-      - /data/joelbaptista/PhD/models:/usr/local/gymnasium/models
+      - $PHD_ROOT/multi_task:RL:/home/gymnasium/code
+      - $PHD_RESULTS/logs:/home/gymnasium/logs
+      - $PHD_RESULTS/models:/home/gymnasium/models
     deploy:
       replicas: ${TRAIN_REPLICAS}  # Set the desired number of replicas

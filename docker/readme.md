@@ -17,3 +17,8 @@
 ## Dettach from running container
 
     press CRTL-p & CRTL-q
+
+
+## For GUI, run the following code outside the container
+
+sudo xhost +local:docker

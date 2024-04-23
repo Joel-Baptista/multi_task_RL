@@ -84,22 +84,6 @@ def setup_experiment(args: dict, file: str = "train.yaml") -> dict:
     overwrite = args['overwrite']
     experiment_name = args['experiment_name']
 
-    # Check if identifier is provided, otherwise set it as "1"
-    if args["identifier"] == "":
-        args["identifier"] = "1"
-    elif args["identifier"] == "auto":
-        # Find the latest experiment folder and increment the identifier
-        files = os.listdir(f'{os.getenv("PHD_MODELS")}/{experiment_name}')
-        folder_experiments = [int(s) for s in files if s.isdigit()]
-
-        if len(folder_experiments) == 0:
-            args["identifier"] = 1
-        else:
-            folder_experiments.sort()
-            args["identifier"] = folder_experiments[-1] + 1 
-            
-    experiment_path = f'{os.getenv("PHD_MODELS")}/{experiment_name}/{args["identifier"]}'    
-
     # Load train config
     PHD_ROOT = os.getenv("PHD_ROOT")
     sys.path.append(PHD_ROOT)
@@ -115,6 +99,22 @@ def setup_experiment(args: dict, file: str = "train.yaml") -> dict:
     cfg_path = f"{PHD_ROOT}/multi_task_RL/experiments/{experiment_base}/{experiment_name}/{file}"
     with open(cfg_path) as f:
         cfg = DotDict(yaml.load(f, Loader=yaml.loader.SafeLoader))
+
+    # Check if identifier is provided, otherwise set it as "1"
+    if args["identifier"] == "":
+        args["identifier"] = "1"
+    elif args["identifier"] == "auto":
+        # Find the latest experiment folder and increment the identifier
+        files = os.listdir(f'{os.getenv("PHD_RESULTS")}/models/{cfg.project}/{experiment_name}')
+        folder_experiments = [int(s) for s in files if s.isdigit()]
+
+        if len(folder_experiments) == 0:
+            args["identifier"] = 1
+        else:
+            folder_experiments.sort()
+            args["identifier"] = folder_experiments[-1] + 1 
+            
+    experiment_path = f'{os.getenv("PHD_RESULTS")}/models/{cfg.project}/{experiment_name}/{args["identifier"]}'    
     
     if not args['debug']:
         if os.path.exists(experiment_path):

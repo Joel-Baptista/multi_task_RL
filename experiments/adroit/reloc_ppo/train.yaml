@@ -2,8 +2,8 @@ project: "Adroit"
 total_timesteps: 50_000_000
 checkpoints: 1_000
 eval_freq: 10_000
-# record_freq: -1
-record_freq: 100_000
+record_freq: -1
+#record_freq: 100_000
 
 env:
   name: "AdroitHandRelocate-v1"
@@ -49,7 +49,7 @@ algorithm:
     # target_kl: 0.27
     # seed: Null
     stats_window_size: 1_000
-    device: "cuda:0"
+    device: "cuda:1"
     # policy_kwargs:
     #   net_arch: [512, 512, 256, 256]
     #   log_std_init: -1

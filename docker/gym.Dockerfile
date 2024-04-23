@@ -1,21 +1,24 @@
-FROM jbaptista99/mujoco:0.0
-
-# #COPY . /usr/local/gymnasium/
-WORKDIR /home/gymnasium/
+FROM jbaptista99/mujoco:1.0
 
 # Test with PyTorch CPU build, since CUDA is not available in CI anyway
 #RUN pip install gymnasium[all,testing] --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cpu
 
-RUN     apt-get update && apt-get install -qqy x11-apps 
-# 
-RUN     export uid=1000 gid=1000
-RUN     mkdir -p /home/docker_user
-RUN     mkdir -p /etc/sudoers.d
-RUN     echo "docker_user:x:${uid}:${gid}:docker_user,,,:/home/docker_user:/bin/bash" >> /etc/passwd
-RUN     echo "docker_user:x:${uid}:" >> /etc/group
-RUN     echo "docker_user ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/docker_user
-RUN     chmod 0440 /etc/sudoers.d/docker_user
-RUN     chown ${uid}:${gid} -R /home/docker_user 
+# ARG USERNAME=kuriboh
+# ARG USER_UID=1000
+# ARG USER_GID=$USER_UID
+
+# Set up user
+# RUN groupadd --gid $USER_GID $USERNAME \
+#     && useradd -s /bin/bash --uid $USER_UID --gid $USER_GID -m $USERNAME \
+#     && apt-get update \
+#     && apt-get install -y sudo wget \
+#     && echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \
+#     && chmod 0440 /etc/sudoers.d/$USERNAME 
+    #
+    # Clean up
+    # && apt-get autoremove -y \
+    # && apt-get clean -y \
+    # && rm -rf /var/lib/apt/lists/*
 
 RUN pip install gymnasium
 RUN pip install gymnasium-robotics
@@ -25,19 +28,26 @@ COPY requirements.txt /tmp/
 RUN pip install --requirement /tmp/requirements.txt
 RUN pip install wandb -U --pre
 
-RUN apt install vim -y
-
 COPY test.py /tmp/
 RUN python3 /tmp/test.py
 
-# RUN mkdir /usr/local/gymnasium/logs
-# RUN mkdir /usr/local/gymnasium/models
-# RUN mkdir /usr/local/gymnasium/code
+RUN cp /root/.zshrc /home/$USERNAME/
+RUN cp /root/.profile /home/$USERNAME/
+RUN cp -r /root/.oh-my-zsh /home/$USERNAME/    
+
+RUN sed -i 's/\/root/\/home\/kuriboh/g' /home/$USERNAME/.zshrc
+
+RUN mkdir /home/gymnasium
 RUN mkdir /home/gymnasium/logs
 RUN mkdir /home/gymnasium/models
 RUN mkdir /home/gymnasium/code
 
-ENV PYTHONPATH="/home/gymnasium/code"
-ENV PHD_ROOT="/home/gymnasium/code"
-ENV PHD_MODELS="/home/gymnasium/models"
+ENV PYTHONPATH=/home/gymnasium/code
+ENV PHD_ROOT=/home/gymnasium/code
+ENV PHD_MODELS=/home/gymnasium/models
 
+RUN cp -r /root/.mujoco /home/$USERNAME/
+
+WORKDIR /home/gymnasium
+
+# USER $USERNAME
