@@ -86,6 +86,7 @@ def setup_experiment(args: dict, file: str = "train.yaml") -> dict:
 
     # Load train config
     PHD_ROOT = os.getenv("PHD_ROOT")
+    PHD_RESULTS = os.getenv("PHD_RESULTS")
     sys.path.append(PHD_ROOT)
 
     experiment_base = None
@@ -105,7 +106,7 @@ def setup_experiment(args: dict, file: str = "train.yaml") -> dict:
         args["identifier"] = "1"
     elif args["identifier"] == "auto":
         # Find the latest experiment folder and increment the identifier
-        files = os.listdir(f'{os.getenv("PHD_RESULTS")}/models/{cfg.project}/{experiment_name}')
+        files = os.listdir(f'{PHD_RESULTS}/models/{cfg.project}/{experiment_name}')
         folder_experiments = [int(s) for s in files if s.isdigit()]
 
         if len(folder_experiments) == 0:
@@ -114,7 +115,7 @@ def setup_experiment(args: dict, file: str = "train.yaml") -> dict:
             folder_experiments.sort()
             args["identifier"] = folder_experiments[-1] + 1 
             
-    experiment_path = f'{os.getenv("PHD_RESULTS")}/models/{cfg.project}/{experiment_name}/{args["identifier"]}'    
+    experiment_path = f'{PHD_RESULTS}/models/{cfg.project}/{experiment_name}/{args["identifier"]}'    
     
     if not args['debug']:
         if os.path.exists(experiment_path):
@@ -134,6 +135,25 @@ def setup_experiment(args: dict, file: str = "train.yaml") -> dict:
     return experiment_name, experiment_path, cfg
 
 def setup_test(args: dict) -> dict:
+    # load train config.
+    PHD_ROOT = os.getenv("PHD_ROOT")
+    PHD_RESULTS = os.getenv("PHD_RESULTS")
+    sys.path.append(PHD_ROOT)
+    experiment_name = args['experiment_name']
+
+    experiment_base = None
+    for folder in os.listdir(f"{PHD_ROOT}/multi_task_RL/experiments/"):
+        print(folder)
+        for experiment in os.listdir(f"{PHD_ROOT}/multi_task_RL/experiments/{folder}"):
+            if experiment == experiment_name: experiment_base = folder
+        if experiment_base is not None: break 
+
+
+    cfg_path = f"{PHD_ROOT}/multi_task_RL/experiments/{experiment_base}/{experiment_name}/test.yaml"
+
+    with open(cfg_path) as f:
+        cfg = DotDict(yaml.load(f, Loader=yaml.loader.SafeLoader))
+
 
     # Check if experiment_name is provided, otherwise assume it as "baseline"
     if args["experiment_name"] is None:
@@ -142,12 +162,12 @@ def setup_test(args: dict) -> dict:
     
     # Check if identifier is provided, otherwise set it as "1"
 
-    experiment_name = args['experiment_name']
+
     if args["identifier"] == "":
         args["identifier"] = "1"
     elif args["identifier"] == "auto":
         # Find the latest experiment folder and increment the identifier
-        files = os.listdir(f'{os.getenv("PHD_MODELS")}/{experiment_name}')
+        files = os.listdir(f'{PHD_RESULTS}/models/{cfg.project}/{experiment_name}')
         folder_experiments = [int(s) for s in files if s.isdigit()]
 
         if len(folder_experiments) == 0:
@@ -156,30 +176,16 @@ def setup_test(args: dict) -> dict:
             folder_experiments.sort()
             args["identifier"] = folder_experiments[-1] + 1 
             
-    experiment_path = f'{os.getenv("PHD_MODELS")}/{experiment_name}/{args["identifier"]}'    
 
-    # load train config.
-    PHD_ROOT = os.getenv("PHD_ROOT")
-    sys.path.append(PHD_ROOT)
-
-    experiment_base = None
-    for folder in os.listdir(f"{PHD_ROOT}/multi_task_RL/experiments/"):
-        print(folder)
-        for experiment in os.listdir(f"{PHD_ROOT}/multi_task_RL/experiments/{folder}"):
-            if experiment == experiment_name: experiment_base = folder
-        if folder is not None: break 
 
     identifier = args['identifier']
     # identifier = f"/{args['identifier']}"
 
-    cfg_path = f"{PHD_ROOT}/multi_task_RL/experiments/{experiment_base}/{experiment_name}/test.yaml"
-    log_path = f'{os.getenv("PHD_MODELS")}/{experiment_name}{identifier}'
+    log_path = f'{PHD_RESULTS}/models/{cfg.project}/{experiment_name}/{identifier}'
 
 
+    experiment_path = f'{PHD_RESULTS}/models/{cfg.project}/{experiment_name}/{args["identifier"]}'    
     print(experiment_path)
-    with open(cfg_path) as f:
-        cfg = DotDict(yaml.load(f, Loader=yaml.loader.SafeLoader))
-
     if not os.path.exists(experiment_path):
         raise Exception(f"Results from experiment '{experiment_name}' does not exist in path: {experiment_path}")
     

@@ -36,6 +36,7 @@ def main():
     parser.add_argument('-id', '--identifier', type=str, default='')
     parser.add_argument('-b', '--best', action="store_true", default=False)
     parser.add_argument('-r', '--record', action="store_true", default=False)
+    parser.add_argument('-s', '--statistic', action="store_true", default=False)
 
     arglist = [x for x in sys.argv[1:] if not x.startswith('__')]
     args = vars(parser.parse_args(args=arglist))
@@ -44,8 +45,22 @@ def main():
     
     log_path, experiment_path, cfg = setup_test(args)
 
+    FPS = 30
+
     render_mode = "human"
-    if args["record"]: render_mode = "rgb_array"
+    
+    if args["statistic"]:
+        render_mode = "rgb_array"
+        cfg.num_test = 100
+        FPS = 1000
+        if args["record"]:
+            args["record"] = False
+            print(f"{Fore.YELLOW}Recording is not available in statistical tests. Shuting down recording{Fore.RESET}")
+    elif args["record"]:  
+        FPS = 1000
+        render_mode = "rgb_array"
+    
+
 
     env = gym.make(cfg.env.name, render_mode=render_mode, **cfg.env.args)
     # env.metadata['render_fps'] = 240
@@ -83,13 +98,6 @@ def main():
             is_single_model = True
             if args["best"]: 
 
-                # evaluations = np.load(f"{experiment_path}/evaluations.npz")
-                # print(evaluations)
-                # print(f"timesteps: {evaluations['timesteps']}")
-                # print(f"results: {evaluations['results']}")
-                # print(f"ep_lengths: {evaluations['ep_lengths']}")
-                # print(f"successes: {evaluations['successes']}")
-
                 experiment_path += "/best_model.zip"
                 break
             else:
@@ -101,25 +109,26 @@ def main():
     print(experiment_path)
     model = model.load(experiment_path)
 
-    # try:
-    #     model.load(f"{experiment_path}")
-    # except: #TODO find more elegant fix
-    #     print(f"{Fore.YELLOW}Stable Baselines models need to specify 'model.zip'{Fore.RESET}")
-    #     model.load(f"{experiment_path}/model.zip")
-    
+    if cfg.env.args.height is None or cfg.env.args.width is None:
+        image_dims = (480, 480)
+    else:
+        image_dims = (cfg.env.args.width, cfg.env.args.height)
+
     print(model.policy)
+    if args["record"]:
+        print(log_path)
+        video = cv.VideoWriter(f"{log_path}/test_video.mp4",
+                                    cv.VideoWriter_fourcc(*"mp4v"),
+                                    30,
+                                    image_dims)
     scores = []
     finished = 0
 
     score = 0
     i = 0
-    fps = 30
-    
-    if args["record"]:
-        video = cv.VideoWriter(f"{log_path}/test_video.mp4",
-                                    cv.VideoWriter_fourcc(*"mp4v"),
-                                    30,
-                                    (480, 480))
+    successes = 0
+    success_ep = []
+    is_success = 0
 
     while True:
         st = time.time()
@@ -134,10 +143,13 @@ def main():
         observation, reward, terminated, truncated, info = env.step(action)
         score += reward
         obs = observation
-        
+        if info["is_success"] : is_success = 1
+
         if terminated or truncated:
             i += 1
             scores.append(score)
+            success_ep.append(is_success)
+            is_success = 0
             finished += 1
 
             if i >= cfg.num_test: break
@@ -147,7 +159,8 @@ def main():
             score = 0
             obs, info = env.reset()
 
-        while time.time() - st  < (1 / fps) and not args["record"]:
+
+        while time.time() - st  < (1 / FPS) and not args["record"]:
             continue
 
     env.close()
@@ -155,6 +168,7 @@ def main():
 
     print(f"Overall mean episode reward: {np.mean(scores)}")
     print(f"Finished episodes percentage: {finished / cfg.num_test * 100} %")
+    print(f"Num of successes: {sum(success_ep)}")
    
 if __name__ == '__main__':
     main() 

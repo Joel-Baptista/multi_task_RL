@@ -38,13 +38,14 @@ RUN cp -r /root/.oh-my-zsh /home/$USERNAME/
 RUN sed -i 's/\/root/\/home\/kuriboh/g' /home/$USERNAME/.zshrc
 
 RUN mkdir /home/gymnasium
-RUN mkdir /home/gymnasium/logs
-RUN mkdir /home/gymnasium/models
+RUN mkdir /home/gymnasium/results
+RUN mkdir /home/gymnasium/results/logs
+RUN mkdir /home/gymnasium/results/models
 RUN mkdir /home/gymnasium/code
 
 ENV PYTHONPATH=/home/gymnasium/code
 ENV PHD_ROOT=/home/gymnasium/code
-ENV PHD_MODELS=/home/gymnasium/models
+ENV PHD_RESULTS=/home/gymnasium/results
 
 RUN cp -r /root/.mujoco /home/$USERNAME/
 

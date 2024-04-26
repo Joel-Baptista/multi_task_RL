@@ -39,10 +39,13 @@ def main():
     parser.add_argument('-ow', '--overwrite', action='store_true')
     parser.add_argument('-id', '--identifier', type=str, default='') # if "auto", then auto assigns
     parser.add_argument('-d', '--debug', action='store_true')
+    parser.add_argument('-a', '--add', action='store_true')
 
     arglist = [x for x in sys.argv[1:] if not x.startswith('__')]
     args = vars(parser.parse_args(args=arglist))
     
+    if args["add"]: args["identifier"] = "auto"
+
     experiment_name, experiment_path, cfg = setup_experiment(args)
 
     print(cfg.algorithm.args)
