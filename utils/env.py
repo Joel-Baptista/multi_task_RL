@@ -1,6 +1,7 @@
 from utils.common import class_from_str
 from gymnasium import Env
 from typing import Any, ClassVar, Dict, List, Optional, Tuple, Type, TypeVar, Union
+import gymnasium as gym
 
 
 def add_wrappers(env: Env, wrappers: Dict) -> Env:
@@ -15,3 +16,19 @@ def add_wrappers(env: Env, wrappers: Dict) -> Env:
         print(f"Wrapping Env with {wrap_class}")
         
     return env
+
+
+def make_env(**kwargs):
+    #TODO continue this function Error in max_episode_step
+    if kwargs["costum"]:
+        module = f"envs.{kwargs['module']}"
+        class_type = kwargs['name']
+
+        env = class_from_str(module, class_type)(**kwargs['args'])
+        record_env = class_from_str(module, class_type)(render_mode="rgb_array", **kwargs['args'])
+
+    else:
+        env = gym.make(kwargs['name'], **kwargs['args'])
+        record_env = gym.make(kwargs['name'], render_mode="rgb_array",**kwargs['args'])
+
+    return env, record_env

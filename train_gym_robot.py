@@ -22,7 +22,7 @@ from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback,
 
 # My Own
 from utils.common import DotDict, model_class_from_str, class_from_str, setup_experiment
-from utils.env import add_wrappers
+from utils.env import add_wrappers, make_env
 from callbacks.video_recorder import VideoRecorder
 
 # # Mujoco
@@ -50,8 +50,10 @@ def main():
 
     print(cfg.algorithm.args)
 
-    env = gym.make(cfg.env.name,**cfg.env.args)
-    record_env = gym.make(cfg.env.name, render_mode="rgb_array",**cfg.env.args)
+    env, record_env = make_env(**cfg.env)
+    
+    # env = gym.make(cfg.env.name,**cfg.env.args)
+    # record_env = gym.make(cfg.env.name, render_mode="rgb_array",**cfg.env.args)
     
     env = add_wrappers(env, cfg.env.wraps)
     record_env = add_wrappers(record_env, cfg.env.wraps)

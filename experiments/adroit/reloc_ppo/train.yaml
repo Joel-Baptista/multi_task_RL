@@ -6,7 +6,10 @@ record_freq: -1
 #record_freq: 100_000
 
 env:
-  name: "AdroitHandRelocate-v1"
+  module: "adroit_reloc"
+  name: "AdroitRelocateEnvV2"
+  # name: "AdroitHandRelocate-v1"
+  costum: True
   args:
     # reward_type: "sparse"
     # tasks_to_complete:
