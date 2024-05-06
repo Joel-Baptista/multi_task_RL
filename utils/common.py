@@ -96,7 +96,7 @@ def setup_experiment(args: dict, file: str = "train.yaml") -> dict:
             if experiment == experiment_name: experiment_base = folder
         
         if experiment_base is not None: break 
-    
+
     cfg_path = f"{PHD_ROOT}/multi_task_RL/experiments/{experiment_base}/{experiment_name}/{file}"
     with open(cfg_path) as f:
         cfg = DotDict(yaml.load(f, Loader=yaml.loader.SafeLoader))

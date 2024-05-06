@@ -50,10 +50,10 @@ def main():
 
     print(cfg.algorithm.args)
 
-    env, record_env = make_env(**cfg.env)
+    # env, record_env = make_env(**cfg.env)
     
-    # env = gym.make(cfg.env.name,**cfg.env.args)
-    # record_env = gym.make(cfg.env.name, render_mode="rgb_array",**cfg.env.args)
+    env = gym.make(cfg.env.name,**cfg.env.args)
+    record_env = gym.make(cfg.env.name, render_mode="rgb_array",**cfg.env.args)
     
     env = add_wrappers(env, cfg.env.wraps)
     record_env = add_wrappers(record_env, cfg.env.wraps)

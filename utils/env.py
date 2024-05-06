@@ -19,14 +19,13 @@ def add_wrappers(env: Env, wrappers: Dict) -> Env:
 
 
 def make_env(**kwargs):
-    #TODO continue this function Error in max_episode_step
-    if kwargs["costum"]:
-        module = f"envs.{kwargs['module']}"
-        class_type = kwargs['name']
-
-        env = class_from_str(module, class_type)(**kwargs['args'])
-        record_env = class_from_str(module, class_type)(render_mode="rgb_array", **kwargs['args'])
-
+    #TODO complete th way to use costum environments
+    if not (len(kwargs["path"])==0):
+        
+        print("HELÇLOO")
+        print(f"{kwargs['path']}:{kwargs['name']}")
+        env = gym.make(f"{kwargs['path']}:{kwargs['path']}/{kwargs['name']}", **kwargs['args'])
+        record_env = gym.make(f"{kwargs['path']}:{kwargs['path']}/{kwargs['name']}", render_mode="rgb_array",**kwargs['args'])
     else:
         env = gym.make(kwargs['name'], **kwargs['args'])
         record_env = gym.make(kwargs['name'], render_mode="rgb_array",**kwargs['args'])

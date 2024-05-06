@@ -630,7 +630,12 @@ class SAC(OffPolicyAlgorithm):
             new_obs, rewards, dones, infos = env.step(actions)
             cais = np.zeros(rewards.shape)
             if self._last_original_obs is not None:
-                obs = self._last_original_obs[:,self.partial_obs[0]:self.partial_obs[1]]
+
+                if self.partial_obs is None:
+                    obs = self._last_original_obs
+                else:
+                    obs = self._last_original_obs[:,self.partial_obs[0]:self.partial_obs[1]]
+                
                 obs = th.Tensor(obs).to(self.device)
                 cais, info = self.calc_causal_influence(obs)
                 cais = cais.unsqueeze(1).cpu().numpy()
