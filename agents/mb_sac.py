@@ -435,6 +435,9 @@ class SAC(OffPolicyAlgorithm):
         self.logger.record("cai/cai", np.mean(
             replay_data.cais.squeeze(1).detach().cpu().numpy()
             ))
+        self.logger.record("cai/rewards", np.mean(
+            replay_data.rewards.squeeze(1).detach().cpu().numpy()
+            ))
         self.logger.record("cai/cai_and_reward", np.mean(
             rewards.squeeze(1).detach().cpu().numpy()
             ))
@@ -637,7 +640,7 @@ class SAC(OffPolicyAlgorithm):
                     obs = self._last_original_obs[:,self.partial_obs[0]:self.partial_obs[1]]
                 
                 obs = th.Tensor(obs).to(self.device)
-                cais, info = self.calc_causal_influence(obs)
+                cais, _ = self.calc_causal_influence(obs)
                 cais = cais.unsqueeze(1).cpu().numpy()
 
             self.num_timesteps += env.num_envs
