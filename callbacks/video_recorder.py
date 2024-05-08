@@ -4,6 +4,7 @@ import gymnasium as gym
 from stable_baselines3.common.vec_env import VecEnv
 
 import cv2 as cv
+import os
 
 
 class VideoRecorder(BaseCallback):
@@ -58,6 +59,49 @@ class VideoRecorder(BaseCallback):
         """
         pass
 
+    # def _on_step(self) -> bool:
+    #     """
+    #     This method will be called by the model after each call to `env.step()`.
+
+    #     For child callback (of an `EventCallback`), this will be called
+    #     when the event is triggered.
+
+    #     :return: If the callback returns False, training is aborted early.
+    #     """
+    #     # print(self.num_timesteps)
+    #     if (self.num_timesteps % self.record_freq) == 0 and self.record_freq > 0:
+    #         print("-------------------Recording Episode!-------------------------")
+    #         obs, _ = self.recording_env.reset()
+    #         total_reward = 0
+    #         timesteps = 0
+    #         self.n_videos += 1
+
+    #         video = cv.VideoWriter(f"{self.log_path}/video_{self.n_videos}.mp4",
+    #                                 cv.VideoWriter_fourcc(*"mp4v"),
+    #                                 30,
+    #                                 (480, 480))
+
+    #         video_arrays = []
+    #         for _ in range(0, 300):
+    #             img = self.recording_env.render()
+                
+    #             video.write(cv.cvtColor(img, cv.COLOR_BGR2RGB))
+
+    #             action, _ = self.model.predict(obs, deterministic=True)
+                
+    #             obs_new, reward, terminated, truncated, info = self.recording_env.step(action)
+
+    #             total_reward += reward
+    #             timesteps += 1
+    #             obs = obs_new
+    #             if terminated or truncated:
+    #                 break
+        
+    #         video.release()
+    #         print(f"Reward: {total_reward}, Ep. Lenght: {timesteps}")
+
+    #     return True
+    
     def _on_step(self) -> bool:
         """
         This method will be called by the model after each call to `env.step()`.
@@ -75,16 +119,33 @@ class VideoRecorder(BaseCallback):
             timesteps = 0
             self.n_videos += 1
 
-            video = cv.VideoWriter(f"{self.log_path}/video_{self.n_videos}.mp4",
-                                    cv.VideoWriter_fourcc(*"mp4v"),
-                                    30,
-                                    (480, 480))
+            video = cv.VideoWriter(f"{self.log_path}/video_aux.mp4",
+                        cv.VideoWriter_fourcc(*"mp4v"),
+                        30,
+                        (480, 480))
+
+            # # Load preexisting video
+            preexisting_video_path = f"{self.log_path}/video.mp4"
+            if os.path.exists(preexisting_video_path):
+                preexisting_video = cv.VideoCapture(preexisting_video_path)
+                while True:
+                    ret, frame = preexisting_video.read()
+                    if not ret:
+                        break
+                    video.write(frame)
+                preexisting_video.release()
+
 
             video_arrays = []
             for _ in range(0, 300):
                 img = self.recording_env.render()
+                img = cv.cvtColor(img, cv.COLOR_BGR2RGB)
                 
-                video.write(cv.cvtColor(img, cv.COLOR_BGR2RGB))
+                # Add episode number to the frame
+                text = f"Steps: {self.num_timesteps}"
+                cv.putText(img, text, (10, 20), cv.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv.LINE_AA)
+
+                video.write(img)
 
                 action, _ = self.model.predict(obs, deterministic=True)
                 
@@ -95,9 +156,10 @@ class VideoRecorder(BaseCallback):
                 obs = obs_new
                 if terminated or truncated:
                     break
-        
+                    
+            os.rename(f"{self.log_path}/video_aux.mp4", f"{self.log_path}/video.mp4")
             video.release()
-            print(f"Reward: {total_reward}, Ep. Lenght: {timesteps}")
+            print(f"Reward: {total_reward}, Ep. Length: {timesteps}")
 
         return True
 
