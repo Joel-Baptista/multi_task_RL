@@ -7,16 +7,14 @@ import cv2 as cv
 import os
 
 
-class VideoRecorder(BaseCallback):
+class SAC_LOGGER(BaseCallback):
     """
     A custom callback that derives from ``BaseCallback``.
 
     :param verbose: Verbosity level: 0 for no output, 1 for info messages, 2 for debug messages
     """
     def __init__(self, 
-                 record_env: Union[gym.Env, VecEnv, None],
                  log_path: str,
-                 record_freq: int = 50, 
                  verbose=0):
         super().__init__(verbose)
         # Those variables will be accessible in the callback
@@ -26,8 +24,6 @@ class VideoRecorder(BaseCallback):
         # type: BaseAlgorithm
         # An alias for self.model.get_env(), the environment used for training
         # self.training_env = None  
-        self.recording_env = record_env  
-        self.record_freq = record_freq
         self.n_videos = 0
         self.log_path = log_path 
         # type: Union[gym.Env, VecEnv, None]
@@ -69,63 +65,16 @@ class VideoRecorder(BaseCallback):
 
         :return: If the callback returns False, training is aborted early.
         """
-        # print(self.num_timesteps)
-        if (self.num_timesteps % self.record_freq) == 0 and self.record_freq > 0:
-            print("-------------------Recording Episode!-------------------------")
-            obs, _ = self.recording_env.reset()
-            total_reward = 0
-            timesteps = 0
-            self.n_videos += 1
-
-            video = cv.VideoWriter(f"{self.log_path}/video_aux.mp4",
-                        cv.VideoWriter_fourcc(*"mp4v"),
-                        30,
-                        (480, 480))
-
-            # # Load preexisting video
-            preexisting_video_path = f"{self.log_path}/video.mp4"
-            if os.path.exists(preexisting_video_path):
-                preexisting_video = cv.VideoCapture(preexisting_video_path)
-                while True:
-                    ret, frame = preexisting_video.read()
-                    if not ret:
-                        break
-                    video.write(frame)
-                preexisting_video.release()
-
-
-            video_arrays = []
-            for _ in range(0, 300):
-                img = self.recording_env.render()
-                img = cv.cvtColor(img, cv.COLOR_BGR2RGB)
-                
-                # Add episode number to the frame
-                text = f"Steps: {self.num_timesteps}"
-                cv.putText(img, text, (10, 20), cv.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv.LINE_AA)
-
-                video.write(img)
-
-                action, _ = self.model.predict(obs, deterministic=True)
-                
-                obs_new, reward, terminated, truncated, info = self.recording_env.step(action)
-
-                total_reward += reward
-                timesteps += 1
-                obs = obs_new
-                if terminated or truncated:
-                    break
-                    
-            os.rename(f"{self.log_path}/video_aux.mp4", f"{self.log_path}/video.mp4")
-            video.release()
-            print(f"Reward: {total_reward}, Ep. Length: {timesteps}")
-
-        return True
+        pass
 
     def _on_rollout_end(self) -> None:
         """
         This event is triggered before updating the policy.
         """
-        pass
+
+        print("Train train train train train")
+
+        return True
 
     def _on_training_end(self) -> None:
         """

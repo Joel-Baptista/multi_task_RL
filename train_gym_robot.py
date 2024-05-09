@@ -2,35 +2,19 @@
 
 # System
 import argparse
-import os
 import sys
-import shutil
-import copy
-
-import yaml
-from colorama import Fore
 from tqdm import tqdm
 
 # Logs
 import wandb
-from wandb.integration.sb3 import WandbCallback
 
 # Reinforcement Learning
 import gymnasium as gym
-import torch as T
-from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback, EvalCallback
 
 # My Own
-from utils.common import DotDict, model_class_from_str, class_from_str, setup_experiment
+from utils.common import class_from_str, setup_experiment
 from utils.env import add_wrappers, make_env
-from callbacks.video_recorder import VideoRecorder
-
-# # Mujoco
-# try:
-#     import mujoco
-#     from mujoco import MjData, MjModel, mjtObj
-# except ImportError as e:
-#     raise error.DependencyNotInstalled(f"{e}. (HINT: you need to install mujoco")
+from utils.sb import setup_callbacks
 
 
 def main():
@@ -44,7 +28,8 @@ def main():
     arglist = [x for x in sys.argv[1:] if not x.startswith('__')]
     args = vars(parser.parse_args(args=arglist))
     
-    if args["add"]: args["identifier"] = "auto"
+    if args["debug"]: args["identifier"] = "debug"
+    elif args["add"]: args["identifier"] = "auto"
 
     experiment_name, experiment_path, cfg = setup_experiment(args)
 
@@ -74,12 +59,12 @@ def main():
     cfg.algorithm.args.model_path = experiment_path
     print(cfg.algorithm.args.model_path)
     if not args['debug']:
-        run = wandb.init(
-            project=cfg.project, 
-            sync_tensorboard=True,
-            config=cfg,
-            name=f"{cfg.algorithm.name}_{experiment_name}{args['identifier']}"
-            )
+        # run = wandb.init(
+        #     project=cfg.project, 
+        #     sync_tensorboard=True,
+        #     config=cfg,
+        #     name=f"{cfg.algorithm.name}_{experiment_name}{args['identifier']}"
+        #     )
 
         if "model_path" in cfg['algorithm']['args'].keys():
             cfg["algorithm"]["args"]["model_path"] = experiment_path
@@ -87,23 +72,12 @@ def main():
         model = algorithm_class(policy_class, 
                                 env, 
                                 verbose=0, 
-                                tensorboard_log=f"{experiment_path}/{run.id}",
+                                # tensorboard_log=f"{experiment_path}/{run.id}",
                                 **cfg.algorithm.args)
         # Setup Callbacks
+
+        callbacks = setup_callbacks(cfg, experiment_path, record_env, model)
         
-        eval_callback = EvalCallback(model.env, best_model_save_path=f'{experiment_path}/best_model',
-                             log_path=f'{experiment_path}', eval_freq=cfg.eval_freq, n_eval_episodes=100,
-                             deterministic=True, render=False)
-        wand_callback = WandbCallback(
-                verbose=2,
-                model_save_path=experiment_path,
-                model_save_freq= int(cfg.total_timesteps / cfg.checkpoints),
-                log = "all"
-                )
-        
-        video_callback = VideoRecorder(record_env, log_path=experiment_path, record_freq=cfg.record_freq)
-        
-        callbacks = CallbackList([eval_callback, wand_callback, video_callback])
         print(model.policy)
         model.learn(
             total_timesteps=cfg.total_timesteps,

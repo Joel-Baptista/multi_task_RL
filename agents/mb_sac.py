@@ -275,6 +275,7 @@ class SAC(OffPolicyAlgorithm):
         ent_coef_losses, ent_coefs = [], []
         actor_losses, critic_losses, world_model_losses = [], [], []
         critic_eval = []
+        log_probs = []
 
         sample_time, world_update_time, cai_time, target_time, ac_update_time, train_time =  [], [], [], [], [], []
 
@@ -362,6 +363,7 @@ class SAC(OffPolicyAlgorithm):
             with th.no_grad():
                 # Select action according to policy
                 next_actions, next_log_prob = self.actor.action_log_prob(replay_data.next_observations)
+                log_probs.append(next_log_prob.mean().item())
                 # Compute the next Q values: min over all critics targets
                 next_q_values = th.cat(self.critic_target(replay_data.next_observations, next_actions), dim=1)
                 next_q_values, _ = th.min(next_q_values, dim=1, keepdim=True)
@@ -373,6 +375,8 @@ class SAC(OffPolicyAlgorithm):
                 rewards = replay_data.rewards + self.lambda_cai * replay_data.cais
 
                 target_q_values = rewards + (1 - replay_data.dones) * self.gamma * next_q_values
+
+                bellman_error = target_q_values - rewards + (1 - replay_data.dones) * self.gamma * next_q_values
 
             target_time.append(time.time() - st)
             # Get current Q-values estimates for each critic network
@@ -432,6 +436,8 @@ class SAC(OffPolicyAlgorithm):
         self.logger.record("train/actor_loss", np.mean(actor_losses))
         self.logger.record("train/critic_loss", np.mean(critic_losses))
         self.logger.record("train/critic_eval", np.mean(critic_eval))
+        self.logger.record("train/bellman_error", np.mean(bellman_error))
+        self.logger.record("train/log_probs", np.mean(log_probs))
         self.logger.record("cai/cai", np.mean(
             replay_data.cais.squeeze(1).detach().cpu().numpy()
             ))

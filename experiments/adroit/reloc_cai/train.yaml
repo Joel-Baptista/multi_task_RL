@@ -2,7 +2,7 @@ project: "Adroit"
 total_timesteps: 50_000_000
 checkpoints: 1_000
 eval_freq: 10_000
-record_freq: 40_000
+record_freq: 20_000
 
 env:
   module: "adroit_reloc"
