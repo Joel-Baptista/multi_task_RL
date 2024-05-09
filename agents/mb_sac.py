@@ -116,6 +116,8 @@ class SAC(OffPolicyAlgorithm):
         world_batch_size: int = 512,
         cai_clip: int = None,
         lambda_cai: int = 1,
+        grad_norm_clipping: Optional[float] = None,
+        weight_decay: float = 1e-4,
         gamma: float = 0.99,
         train_freq: Union[int, Tuple[int, str]] = 1,
         gradient_steps: int = 1,
@@ -181,6 +183,7 @@ class SAC(OffPolicyAlgorithm):
         self.lambda_cai = lambda_cai
         self.cai_clip = cai_clip
         self.replay_buffer: ReplayBufferCAI
+        self.grad_norm_clipping = grad_norm_clipping
         
 
         if "partial_obs" in world_model.keys():
@@ -217,6 +220,8 @@ class SAC(OffPolicyAlgorithm):
         print(self.device)
         self.world_model.to(self.device)
         print(self.world_model)
+
+        self.critic.optimizer = th.optim.Adam(self.critic.parameters(), lr=learning_rate, weight_decay=weight_decay)
 
     def _setup_model(self) -> None:
         super()._setup_model()
@@ -277,6 +282,8 @@ class SAC(OffPolicyAlgorithm):
         critic_eval = []
         log_probs = []
 
+        world_grad_norms, actor_grad_norms, critic_grad_norms = [], [], []
+
         sample_time, world_update_time, cai_time, target_time, ac_update_time, train_time =  [], [], [], [], [], []
 
         # print(f"Setup time: {time.time() - st}")
@@ -314,6 +321,9 @@ class SAC(OffPolicyAlgorithm):
 
                     self.world_model.optim.zero_grad()
                     model_loss.backward()
+                    if self.grad_norm_clipping is not None:
+                        world_grad_norm = th.nn.utils.clip_grad_norm_(self.world_model.parameters(), self.grad_norm_clipping)
+                        world_grad_norms.append(world_grad_norm.mean().item())
                     self.world_model.optim.step()
 
                     world_model_losses.append(model_loss.item())
@@ -376,8 +386,6 @@ class SAC(OffPolicyAlgorithm):
 
                 target_q_values = rewards + (1 - replay_data.dones) * self.gamma * next_q_values
 
-                bellman_error = target_q_values - rewards + (1 - replay_data.dones) * self.gamma * next_q_values
-
             target_time.append(time.time() - st)
             # Get current Q-values estimates for each critic network
             # using action from the replay buffer
@@ -393,6 +401,9 @@ class SAC(OffPolicyAlgorithm):
             # Optimize the critic
             self.critic.optimizer.zero_grad()
             critic_loss.backward()
+            if self.grad_norm_clipping is not None:
+                critic_grad_norm = th.nn.utils.clip_grad_norm_(self.critic.parameters(), self.grad_norm_clipping)
+                critic_grad_norms.append(critic_grad_norm.mean().item())
             self.critic.optimizer.step()
             
             # print(f"Optimize Critic time: {time.time() - st}")
@@ -410,6 +421,9 @@ class SAC(OffPolicyAlgorithm):
             # Optimize the actor
             self.actor.optimizer.zero_grad()
             actor_loss.backward()
+            if self.grad_norm_clipping is not None:
+                actor_grad_norm = th.nn.utils.clip_grad_norm_(self.actor.parameters(), self.grad_norm_clipping)
+                actor_grad_norms.append(actor_grad_norm.mean().item())
             self.actor.optimizer.step()
             
             ac_update_time.append(time.time() - st)
@@ -436,8 +450,14 @@ class SAC(OffPolicyAlgorithm):
         self.logger.record("train/actor_loss", np.mean(actor_losses))
         self.logger.record("train/critic_loss", np.mean(critic_losses))
         self.logger.record("train/critic_eval", np.mean(critic_eval))
-        self.logger.record("train/bellman_error", np.mean(bellman_error))
         self.logger.record("train/log_probs", np.mean(log_probs))
+
+        if len(actor_grad_norms) > 0:
+            self.logger.record("gradients/actor", np.mean(actor_grad_norms))
+        if len(critic_grad_norms) > 0:
+            self.logger.record("gradients/critic", np.mean(critic_grad_norms))
+        if len(world_grad_norms) > 0:
+            self.logger.record("gradients/world", np.mean(world_grad_norms))
         self.logger.record("cai/cai", np.mean(
             replay_data.cais.squeeze(1).detach().cpu().numpy()
             ))

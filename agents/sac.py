@@ -106,6 +106,8 @@ class SAC_LOG(OffPolicyAlgorithm):
         ent_coef: Union[str, float] = "auto",
         target_update_interval: int = 1,
         target_entropy: Union[str, float] = "auto",
+        grad_norm_clipping: Optional[float] = None,
+        weight_decay: float = 1e-4,
         use_sde: bool = False,
         sde_sample_freq: int = -1,
         use_sde_at_warmup: bool = False,
@@ -152,9 +154,12 @@ class SAC_LOG(OffPolicyAlgorithm):
         self.ent_coef = ent_coef
         self.target_update_interval = target_update_interval
         self.ent_coef_optimizer: Optional[th.optim.Adam] = None
+        self.grad_norm_clipping = grad_norm_clipping 
 
         if _init_setup_model:
             self._setup_model()
+
+        self.critic.optimizer = th.optim.Adam(self.critic.parameters(), lr=learning_rate, weight_decay=weight_decay)
 
     def _setup_model(self) -> None:
         super()._setup_model()
@@ -212,6 +217,8 @@ class SAC_LOG(OffPolicyAlgorithm):
         critic_eval = []
         log_probs = []
 
+        actor_grad_norms, critic_grad_norms = [], []
+
         for gradient_step in range(gradient_steps):
             # Sample replay buffer
             replay_data = self.replay_buffer.sample(batch_size, env=self._vec_normalize_env)  # type: ignore[union-attr]
@@ -257,8 +264,6 @@ class SAC_LOG(OffPolicyAlgorithm):
                 # td error + entropy term
                 target_q_values = replay_data.rewards + (1 - replay_data.dones) * self.gamma * next_q_values
 
-                bellman_error = target_q_values - replay_data.rewards + (1 - replay_data.dones) * self.gamma * next_q_values
-
             # Get current Q-values estimates for each critic network
             # using action from the replay buffer
             current_q_values = self.critic(replay_data.observations, replay_data.actions)
@@ -271,6 +276,9 @@ class SAC_LOG(OffPolicyAlgorithm):
             # Optimize the critic
             self.critic.optimizer.zero_grad()
             critic_loss.backward()
+            if self.grad_norm_clipping is not None:
+                critic_grad_norm = th.nn.utils.clip_grad_norm_(self.critic.parameters(), self.grad_norm_clipping)
+                critic_grad_norms.append(critic_grad_norm.mean().item())
             self.critic.optimizer.step()
 
             # Compute actor loss
@@ -284,6 +292,9 @@ class SAC_LOG(OffPolicyAlgorithm):
             # Optimize the actor
             self.actor.optimizer.zero_grad()
             actor_loss.backward()
+            if self.grad_norm_clipping is not None:
+                actor_grad_norm = th.nn.utils.clip_grad_norm_(self.actor.parameters(), self.grad_norm_clipping)
+                actor_grad_norms.append(actor_grad_norm.mean().item())
             self.actor.optimizer.step()
 
             # Update target networks
@@ -299,8 +310,11 @@ class SAC_LOG(OffPolicyAlgorithm):
         self.logger.record("train/actor_loss", np.mean(actor_losses))
         self.logger.record("train/critic_loss", np.mean(critic_losses))
         self.logger.record("train/critic_eval", np.mean(critic_eval))
-        self.logger.record("train/bellman_error", np.mean(bellman_error))
         self.logger.record("train/log_probs", np.mean(log_probs))
+        if len(actor_grad_norms) > 0:
+            self.logger.record("gradients/actor", np.mean(actor_grad_norms))
+        if len(critic_grad_norms) > 0:
+            self.logger.record("gradients/critic", np.mean(critic_grad_norms))
         if len(ent_coef_losses) > 0:
             self.logger.record("train/ent_coef_loss", np.mean(ent_coef_losses))
 

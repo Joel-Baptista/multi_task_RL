@@ -50,6 +50,8 @@ algorithm:
       world_num_updates: 1
       world_batch_size: 512
       ent_coef: 0 # Number for fixed, "auto" for learned
+      grad_norm_clipping: 1
+      weight_decay: 0.0001
       action_noise: Null
       seed: Null
       device: "cuda:0"

@@ -46,8 +46,11 @@ def main():
     env.reset()
     obs, reward, terminated, truncated, info = env.step(env.action_space.sample())
     
-    print(env.observation_space.shape)
-    print(env.reward_range)
+    print(f"Observation: {obs}")
+
+    print(f"Observation space: {env.observation_space}")
+    print(f"Action space: {env.action_space}")
+
     
     print(cfg.algorithm.module)
     print(f"Algorithm class: {class_from_str(cfg.algorithm.module, cfg.algorithm.name)}")
@@ -59,12 +62,12 @@ def main():
     cfg.algorithm.args.model_path = experiment_path
     print(cfg.algorithm.args.model_path)
     if not args['debug']:
-        # run = wandb.init(
-        #     project=cfg.project, 
-        #     sync_tensorboard=True,
-        #     config=cfg,
-        #     name=f"{cfg.algorithm.name}_{experiment_name}{args['identifier']}"
-        #     )
+        run = wandb.init(
+            project=cfg.project, 
+            sync_tensorboard=True,
+            config=cfg,
+            name=f"{cfg.algorithm.name}_{experiment_name}{args['identifier']}"
+            )
 
         if "model_path" in cfg['algorithm']['args'].keys():
             cfg["algorithm"]["args"]["model_path"] = experiment_path
@@ -72,7 +75,7 @@ def main():
         model = algorithm_class(policy_class, 
                                 env, 
                                 verbose=0, 
-                                # tensorboard_log=f"{experiment_path}/{run.id}",
+                                tensorboard_log=f"{experiment_path}/{run.id}",
                                 **cfg.algorithm.args)
         # Setup Callbacks
 
