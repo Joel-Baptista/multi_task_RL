@@ -2,7 +2,7 @@ project: "Adroit"
 total_timesteps: 50_000_000
 checkpoints: 1_000
 eval_freq: 20_000
-record_freq: -1
+record_freq: 20_000
 #record_freq: 100_000
 
 env:
@@ -22,8 +22,8 @@ env:
     #     name: "reward_wrap"
     #     module: "wraps.reward"
     - wrap:
-        name: "cai_wrap"
-        module: "wraps.reward.adroit"
+        name: "correct_success_wrap"
+        module: "wraps.reward"
 
 
 policy: 
@@ -34,7 +34,7 @@ algorithm:
   name: "SAC_LOG"
   module: "agents.sac"
   args:
-      learning_rate: 0.0003
+      learning_rate: 0.00003
       buffer_size: 10_000_000
       learning_starts: 256
       batch_size: 512
@@ -44,9 +44,10 @@ algorithm:
       gradient_steps: 1
       grad_norm_clipping: 1
       weight_decay: 0.0001
+      ent_coef: "auto"
       action_noise: Null
       seed: Null
       stats_window_size: 1_000
-      device: "cuda:1"
+      device: "cuda:0"
       policy_kwargs:
-        net_arch: [1024, 512, 512, 512, 256, 256]
+        net_arch: [512, 256, 256]

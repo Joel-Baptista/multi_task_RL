@@ -321,9 +321,9 @@ class SAC(OffPolicyAlgorithm):
 
                     self.world_model.optim.zero_grad()
                     model_loss.backward()
-                    if self.grad_norm_clipping is not None:
-                        world_grad_norm = th.nn.utils.clip_grad_norm_(self.world_model.parameters(), self.grad_norm_clipping)
-                        world_grad_norms.append(world_grad_norm.mean().item())
+                    # if self.grad_norm_clipping is not None:
+                    #     world_grad_norm = th.nn.utils.clip_grad_norm_(self.world_model.parameters(), self.grad_norm_clipping)
+                    #     world_grad_norms.append(world_grad_norm.mean().item())
                     self.world_model.optim.step()
 
                     world_model_losses.append(model_loss.item())

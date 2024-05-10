@@ -24,8 +24,8 @@ env:
     #     name: "reward_wrap"
     #     module: "wraps.reward"
     - wrap:
-        name: "correct_success_wrap"
-        module: "wraps.reward"
+        name: "grab_object_wrap"
+        module: "wraps.reward.adroit"
 
 policy: 
   name: "SACPolicy"
@@ -54,7 +54,7 @@ algorithm:
       weight_decay: 0.0001
       action_noise: Null
       seed: Null
-      device: "cuda:1"
+      device: "cuda:2"
       model_path: Null
       stats_window_size: 1_000
       world_model:
