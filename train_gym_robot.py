@@ -31,7 +31,7 @@ def main():
     if args["debug"]: args["identifier"] = "debug"
     elif args["add"]: args["identifier"] = "auto"
 
-    experiment_name, experiment_path, cfg = setup_experiment(args)
+    experiment_name, experiment_path, log_path, cfg = setup_experiment(args)
 
     print(cfg.algorithm.args)
 
@@ -75,11 +75,11 @@ def main():
         model = algorithm_class(policy_class, 
                                 env, 
                                 verbose=0, 
-                                tensorboard_log=f"{experiment_path}/{run.id}",
+                                tensorboard_log=f"{log_path}/{run.id}",
                                 **cfg.algorithm.args)
         # Setup Callbacks
 
-        callbacks = setup_callbacks(cfg, experiment_path, record_env, model)
+        callbacks = setup_callbacks(cfg, experiment_path, log_path, record_env, model)
         
         print(model.policy)
         model.learn(

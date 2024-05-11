@@ -116,6 +116,7 @@ def setup_experiment(args: dict, file: str = "train.yaml") -> dict:
             args["identifier"] = folder_experiments[-1] + 1 
             
     experiment_path = f'{PHD_RESULTS}/models/{cfg.project}/{experiment_name}/{args["identifier"]}'    
+    log_path = f'{PHD_RESULTS}/logs/{cfg.project}/{experiment_name}/{args["identifier"]}'    
     
     if not args['debug']:
         if os.path.exists(experiment_path):
@@ -131,8 +132,13 @@ def setup_experiment(args: dict, file: str = "train.yaml") -> dict:
         os.makedirs(f"{experiment_path}/best_model")
         print(f"Path create: {experiment_path}") 
         shutil.copy(cfg_path, f"{experiment_path}/train.yaml")
+
+        # Create folder to store the results
+        os.makedirs(log_path)
+        print(f"Path create: {log_path}") 
+        shutil.copy(cfg_path, f"{log_path}/train.yaml")
     
-    return experiment_name, experiment_path, cfg
+    return experiment_name, experiment_path, log_path, cfg
 
 def setup_test(args: dict) -> dict:
     # load train config.
@@ -181,7 +187,7 @@ def setup_test(args: dict) -> dict:
     identifier = args['identifier']
     # identifier = f"/{args['identifier']}"
 
-    log_path = f'{PHD_RESULTS}/models/{cfg.project}/{experiment_name}/{identifier}'
+    log_path = f'{PHD_RESULTS}/logs/{cfg.project}/{experiment_name}/{identifier}'
 
 
     experiment_path = f'{PHD_RESULTS}/models/{cfg.project}/{experiment_name}/{args["identifier"]}'    

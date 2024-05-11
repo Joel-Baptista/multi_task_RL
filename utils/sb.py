@@ -4,10 +4,10 @@ from wandb.integration.sb3 import WandbCallback
 
 from utils.common import class_from_str
 
-def setup_callbacks(cfg, experiment_path, record_env, model):
+def setup_callbacks(cfg, experiment_path, log_path, record_env, model):
 
     eval_callback = EvalCallback(model.env, best_model_save_path=f'{experiment_path}/best_model',
-                        log_path=f'{experiment_path}', eval_freq=cfg.eval_freq, n_eval_episodes=100,
+                        log_path=f'{log_path}', eval_freq=cfg.eval_freq, n_eval_episodes=100,
                         deterministic=True, render=False)
     wand_callback = WandbCallback(
             verbose=2,
@@ -16,7 +16,7 @@ def setup_callbacks(cfg, experiment_path, record_env, model):
             log = "all"
             )
     
-    video_callback = VideoRecorder(record_env, log_path=experiment_path, record_freq=cfg.record_freq)
+    video_callback = VideoRecorder(record_env, log_path=log_path, record_freq=cfg.record_freq)
     
     callbacks_list = [eval_callback, wand_callback, video_callback]
     # callbacks_list = [eval_callback, video_callback]
