@@ -35,7 +35,7 @@ algorithm:
   name: "SAC"
   module: "agents.mb_sac"
   args:
-      learning_rate: 0.00003
+      learning_rate: 0.0003
       buffer_size: 10_000_000
       learning_starts: 256
       batch_size: 256
@@ -70,5 +70,6 @@ algorithm:
           weight_decay: 0.00001
           std: "auto" # "auto" for adaptable; number for fixed
       policy_kwargs:
-        net_arch: [512, 256, 256]
-
+        net_arch: 
+          pi: [512, 256, 256]
+          qf: [1024, 512, 512, 512, 256, 256]

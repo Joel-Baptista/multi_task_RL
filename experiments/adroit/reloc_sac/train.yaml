@@ -44,10 +44,12 @@ algorithm:
       gradient_steps: 1
       grad_norm_clipping: 1
       weight_decay: 0.0001
-      ent_coef: 0.1
+      ent_coef: 0.01
       action_noise: Null
       seed: Null
       stats_window_size: 1_000
       device: "cuda:0"
       policy_kwargs:
-        net_arch: [512, 256, 256]
+        net_arch: 
+          pi: [512, 256, 256]
+          qf: [512, 256, 256]

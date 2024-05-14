@@ -122,7 +122,9 @@ def setup_experiment(args: dict, file: str = "train.yaml") -> dict:
         if os.path.exists(experiment_path):
             if overwrite:
                 shutil.rmtree(experiment_path)
+                shutil.rmtree(log_path)
                 print(f'Removing original {experiment_path}')
+                print(f'Removing original {log_path}')
             else:
                 print(f'{experiment_path} already exits. ')
                 raise Exception('Experiment name already exists. If you want to overwrite, use flag -ow')
