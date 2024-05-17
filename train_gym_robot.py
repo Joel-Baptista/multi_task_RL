@@ -66,6 +66,7 @@ def main():
             project=cfg.project, 
             sync_tensorboard=True,
             config=cfg,
+            dir=log_path,
             name=f"{cfg.algorithm.name}_{experiment_name}{args['identifier']}"
             )
 

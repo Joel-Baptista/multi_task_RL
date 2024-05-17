@@ -4,6 +4,7 @@ checkpoints: 1_000
 eval_freq: 20_000
 record_freq: 50_000
 #record_freq: 100_000
+# record_freq: 1
 
 env:
   name: "AdroitHandRelocate-v1"
@@ -52,4 +53,4 @@ algorithm:
       policy_kwargs:
         net_arch: 
           pi: [512, 256, 256]
-          qf: [512, 256, 256]
+          qf: [1024, 512, 512, 512, 256, 256]
