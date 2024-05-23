@@ -253,8 +253,10 @@ class SAC_LOG(OffPolicyAlgorithm):
 
             with th.no_grad():
                 # Select action according to policy
+                # print(np.array(replay_data.observations)[0])
                 next_actions, next_log_prob = self.actor.action_log_prob(replay_data.next_observations)
                 log_probs.append(next_log_prob.mean().item())
+
                 # Compute the next Q values: min over all critics targets
                 next_q_values = th.cat(self.critic_target(replay_data.next_observations, next_actions), dim=1)
                 next_q_values, _ = th.min(next_q_values, dim=1, keepdim=True)
@@ -311,6 +313,7 @@ class SAC_LOG(OffPolicyAlgorithm):
         self.logger.record("train/critic_loss", np.mean(critic_losses))
         self.logger.record("train/critic_eval", np.mean(critic_eval))
         self.logger.record("train/log_probs", np.mean(log_probs))
+        self.logger.record("train/max_obs", th.max(th.abs(replay_data.observations)).item())
         if len(actor_grad_norms) > 0:
             self.logger.record("gradients/actor", np.mean(actor_grad_norms))
         if len(critic_grad_norms) > 0:

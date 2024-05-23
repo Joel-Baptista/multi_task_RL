@@ -29,6 +29,7 @@ from models import *
 from utils.common import DotDict, model_class_from_str, class_from_str, setup_test
 from utils.env import add_wrappers
 import cv2 as cv
+from wraps.observation.obs_norm_wrap import OBS_NORM_WRAP
 
 def main():
     parser = argparse.ArgumentParser(description='Train asl2text models.')
@@ -129,6 +130,7 @@ def main():
     successes = 0
     success_ep = []
     is_success = 0
+    highest_input_value = 0
 
     while True:
         st = time.time()
@@ -143,6 +145,14 @@ def main():
         observation, reward, terminated, truncated, info = env.step(action)
         score += reward
         obs = observation
+        
+        max_obs = np.max(np.abs(obs))
+        print(obs)
+        print(max_obs)
+
+
+        if max_obs > highest_input_value: highest_input_value = max_obs
+
         if info["is_success"] : is_success = 1
 
         if terminated or truncated:
@@ -169,6 +179,7 @@ def main():
     print(f"Overall mean episode reward: {np.mean(scores)}")
     print(f"Finished episodes percentage: {finished / cfg.num_test * 100} %")
     print(f"Num of successes: {sum(success_ep)}")
+    print(f"Highest Input Value: {highest_input_value}")
    
 if __name__ == '__main__':
     main() 
