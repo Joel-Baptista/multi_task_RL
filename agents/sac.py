@@ -146,12 +146,13 @@ class SAC_LOG(OffPolicyAlgorithm):
             supported_action_spaces=(spaces.Box,),
             support_multi_env=True,
         )
-
+        print(f"Intented Device: {device}")
         self.target_entropy = target_entropy
         self.log_ent_coef = None  # type: Optional[th.Tensor]
         # Entropy coefficient / Entropy temperature
         # Inverse of the reward scale
         self.ent_coef = ent_coef
+        self.max_grad = 0
         self.target_update_interval = target_update_interval
         self.ent_coef_optimizer: Optional[th.optim.Adam] = None
         self.grad_norm_clipping = grad_norm_clipping 
@@ -279,7 +280,45 @@ class SAC_LOG(OffPolicyAlgorithm):
             self.critic.optimizer.zero_grad()
             critic_loss.backward()
             if self.grad_norm_clipping is not None:
-                critic_grad_norm = th.nn.utils.clip_grad_norm_(self.critic.parameters(), self.grad_norm_clipping)
+                
+
+                total_norm_q0 = 0
+                for p in self.critic.qf0.parameters():
+                    param_norm = p.grad.data.norm(2)
+                    total_norm_q0 += param_norm.item() ** 2
+                total_norm_q0 = total_norm_q0 ** (1. / 2)
+                # print(f"Qf0: {total_norm}")
+                
+                total_norm_q1 = 0
+                for p in self.critic.qf1.parameters():
+                    param_norm = p.grad.data.norm(2)
+                    total_norm_q1 += param_norm.item() ** 2
+                total_norm_q1 = total_norm_q1 ** (1. / 2)
+                # print(f"Qf1: {total_norm_q1}")               
+
+                critic_grad_norm_1 = th.nn.utils.clip_grad_norm_(self.critic.qf0.parameters(), self.grad_norm_clipping)
+                critic_grad_norm_2 = th.nn.utils.clip_grad_norm_(self.critic.qf1.parameters(), self.grad_norm_clipping)
+                
+                critic_grad_norm = (critic_grad_norm_2 + critic_grad_norm_1) / 2 
+
+                # total_norm_q0 = 0
+                # for p in self.critic.qf0.parameters():
+                #     param_norm = p.grad.data.norm(2)
+                #     total_norm_q0 += param_norm.item() ** 2
+                # total_norm_q0 = total_norm_q0 ** (1. / 2)
+                # # print(f"Qf0: {total_norm}")
+                
+                # total_norm_q1 = 0
+                # for p in self.critic.qf1.parameters():
+                #     param_norm = p.grad.data.norm(2)
+                #     total_norm_q1 += param_norm.item() ** 2
+                # total_norm_q1 = total_norm_q1 ** (1. / 2)
+                # # print(f"Qf1: {total_norm_q1}")
+
+                if self.max_grad < total_norm_q0: self.max_grad = total_norm_q0
+                if self.max_grad < total_norm_q1: self.max_grad = total_norm_q1
+
+                # print("------------------------------------------")
                 critic_grad_norms.append(critic_grad_norm.mean().item())
             self.critic.optimizer.step()
 
@@ -318,6 +357,8 @@ class SAC_LOG(OffPolicyAlgorithm):
             self.logger.record("gradients/actor", np.mean(actor_grad_norms))
         if len(critic_grad_norms) > 0:
             self.logger.record("gradients/critic", np.mean(critic_grad_norms))
+        
+        self.logger.record("gradients/max_critic", self.max_grad)
         if len(ent_coef_losses) > 0:
             self.logger.record("train/ent_coef_loss", np.mean(ent_coef_losses))
 
