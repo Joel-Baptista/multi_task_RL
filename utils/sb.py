@@ -17,13 +17,13 @@ def setup_callbacks(cfg, experiment_path, log_path, record_env, model):
             log = "all"
             )
     
-    early_stopping = EarlyStopping(
-            verbose=2
-            )
+#     early_stopping = EarlyStopping(
+#             verbose=2
+#             )
     
     video_callback = VideoRecorder(record_env, log_path=log_path, record_freq=cfg.record_freq)
     
-    callbacks_list = [eval_callback, wand_callback, video_callback, early_stopping]
+    callbacks_list = [eval_callback, wand_callback, video_callback]
     # callbacks_list = [eval_callback, video_callback]
 
     if not (cfg.algorithm.callbacks is None):

@@ -38,7 +38,7 @@ args = {
 nested_args = {"policy_kwargs":  ["net_arch"]}
 
 def main():
-    
+    device = os.environ.get("DEVICE")
     experiment_name, experiment_path, log_path, cfg = setup_experiment(args)
  
     run = wandb.init(
@@ -78,7 +78,7 @@ def main():
             print(key_arg)
             del config_directory[key_arg]
 
-    config_directory["device"] = cfg.algorithm.args.device
+    config_directory["device"] = device
     print(config_directory)
     early_stopping = EarlyStopping(
             verbose=2
