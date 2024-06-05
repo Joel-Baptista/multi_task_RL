@@ -106,6 +106,8 @@ def setup_experiment(args: dict, file: str = "train.yaml") -> dict:
         args["identifier"] = "1"
     elif args["identifier"] == "auto":
         # Find the latest experiment folder and increment the identifier
+        if not os.path.exists(f'{PHD_RESULTS}/models/{cfg.project}/{experiment_name}'):
+            os.makedirs(f'{PHD_RESULTS}/models/{cfg.project}/{experiment_name}')
         files = os.listdir(f'{PHD_RESULTS}/models/{cfg.project}/{experiment_name}')
         folder_experiments = [int(s) for s in files if s.isdigit()]
 

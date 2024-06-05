@@ -25,6 +25,9 @@ env:
     - wrap:
         name: "correct_success_wrap"
         module: "wraps.reward"
+    - wrap:
+        name: "reduce_joints"
+        module: "wraps.action.adroit"
 
 
 policy: 
@@ -49,7 +52,7 @@ algorithm:
       action_noise: Null
       seed: Null
       stats_window_size: 1_000
-      device: "cuda:1"
+      device: "cuda:2"
       policy_kwargs:
         net_arch: 
           pi: [512, 256, 256]
