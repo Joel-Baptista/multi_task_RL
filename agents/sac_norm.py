@@ -11,10 +11,11 @@ from stable_baselines3.common.off_policy_algorithm import OffPolicyAlgorithm
 from stable_baselines3.common.policies import BasePolicy, ContinuousCritic
 from stable_baselines3.common.type_aliases import GymEnv, MaybeCallback, Schedule
 from stable_baselines3.common.utils import get_parameters_by_name, polyak_update
-from stable_baselines3.sac.policies import Actor, CnnPolicy, MlpPolicy, MultiInputPolicy, SACPolicy
-
+from stable_baselines3.sac.policies import CnnPolicy, MlpPolicy, MultiInputPolicy
 SelfSAC = TypeVar("SelfSAC", bound="SAC_NORM")
 
+# Mine
+from agents.actor_std import Actor, SACPolicy
 
 # This implemetation of SAC with normalize the log probs, in favor of stability
 

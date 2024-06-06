@@ -29,7 +29,7 @@ env:
 
 policy: 
   name: "SACPolicy"
-  module: "stable_baselines3.sac.policies"
+  module: "agents.actor_std"
 
 algorithm: 
   name: "SAC_NORM"
@@ -43,9 +43,9 @@ algorithm:
       gamma: 0.99
       train_freq: 1
       gradient_steps: 1
-      grad_norm_clipping: 0.1
-      weight_decay: 0.0001
-      ent_coef: "auto_0.00001"
+      grad_norm_clipping: 1
+      weight_decay: 0
+      ent_coef: "auto"
       action_noise: Null
       seed: Null
       stats_window_size: 1_000
@@ -54,3 +54,4 @@ algorithm:
         net_arch: 
           pi: [1024, 512, 256, 256]
           qf: [1024, 512, 256, 256]
+        log_std_lims: [-6, 2]
