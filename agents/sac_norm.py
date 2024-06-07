@@ -111,6 +111,7 @@ class SAC_NORM(OffPolicyAlgorithm):
         target_entropy: Union[str, float] = "auto",
         grad_norm_clipping: Optional[float] = None,
         weight_decay: float = 1e-4,
+        max_log_probs: float = 20,
         use_sde: bool = False,
         sde_sample_freq: int = -1,
         use_sde_at_warmup: bool = False,
@@ -159,6 +160,7 @@ class SAC_NORM(OffPolicyAlgorithm):
         self.target_update_interval = target_update_interval
         self.ent_coef_optimizer: Optional[th.optim.Adam] = None
         self.grad_norm_clipping = grad_norm_clipping 
+        self.max_log_probs = max_log_probs
 
         if _init_setup_model:
             self._setup_model()
@@ -234,7 +236,7 @@ class SAC_NORM(OffPolicyAlgorithm):
             # Action by the current actor for the sampled state
             actions_pi, log_prob = self.actor.action_log_prob(replay_data.observations)
             log_prob = log_prob.reshape(-1, 1)
-            log_prob = th.clamp(log_prob, max=0) # Only negative values
+            log_prob = th.clamp(log_prob, max=self.max_log_probs) 
 
             ent_coef_loss = None
             if self.ent_coef_optimizer is not None and self.log_ent_coef is not None:
@@ -261,7 +263,7 @@ class SAC_NORM(OffPolicyAlgorithm):
                 # print(np.array(replay_data.observations)[0])
                 next_actions, next_log_prob = self.actor.action_log_prob(replay_data.next_observations)
                 next_log_prob = next_log_prob.reshape(-1, 1)
-                next_log_prob = th.clamp(next_log_prob, max=0) # Only negative values
+                next_log_prob = th.clamp(next_log_prob, max=self.max_log_probs) # Only negative values
                 
                 log_probs.append(next_log_prob.mean().item())
 

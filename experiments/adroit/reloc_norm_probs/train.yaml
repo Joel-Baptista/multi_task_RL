@@ -45,6 +45,7 @@ algorithm:
       gradient_steps: 1
       grad_norm_clipping: 1
       weight_decay: 0
+      max_log_probs: 20
       ent_coef: "auto"
       action_noise: Null
       seed: Null
@@ -54,4 +55,4 @@ algorithm:
         net_arch: 
           pi: [1024, 512, 256, 256]
           qf: [1024, 512, 256, 256]
-        log_std_lims: [-6, 2]
+        log_std_lims: [-4, 2]

@@ -305,7 +305,6 @@ class SAC(OffPolicyAlgorithm):
                     st = time.time()
                     world_data = self.replay_buffer.sample(self.world_batch_size, env=self._vec_normalize_env)
 
-
                     if self.partial_obs is None:
                         obs = world_data.observations
                         obs_next = world_data.next_observations
