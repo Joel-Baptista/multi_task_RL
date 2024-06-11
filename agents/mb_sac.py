@@ -200,15 +200,10 @@ class SAC(OffPolicyAlgorithm):
         print(env.action_space.shape[0])
         print(env.observation_space.shape[0])
 
-        if self.partial_obs is None:
-            obs_shape = env.observation_space.shape[0]
-        else:
-            obs_shape = self.partial_obs[1] - self.partial_obs[0]
-
         world_model['args']['device'] = self.device
         self.world_model = class_from_str(f"{world_model['module']}.{world_model['name']}", world_model['name'].upper())(
-            inp_dim = env.action_space.shape[0] + obs_shape, 
-            outp_dim = obs_shape, 
+            inp_dim = env.action_space.shape[0] + env.observation_space.shape[0], 
+            outp_dim = env.observation_space.shape[0], 
             **world_model['args']
             )
         # print(f"For Entropy: {float(-np.prod(self.env.action_space.shape).astype(np.float32))}")
@@ -305,18 +300,11 @@ class SAC(OffPolicyAlgorithm):
                     st = time.time()
                     world_data = self.replay_buffer.sample(self.world_batch_size, env=self._vec_normalize_env)
 
-                    if self.partial_obs is None:
-                        obs = world_data.observations
-                        obs_next = world_data.next_observations
-                    else:
-                        obs = world_data.observations[:,self.partial_obs[0]:self.partial_obs[1]]
-                        obs_next = world_data.next_observations[:,self.partial_obs[0]:self.partial_obs[1]]
-
-                    model_inp = th.concat((obs, world_data.actions), dim=1).type(th.float32)
+                    model_inp = th.concat((world_data.observations, world_data.actions), dim=1).type(th.float32)
 
                     mu_next, log_std_next = self.world_model(model_inp)
 
-                    model_loss = self.world_model.calc_loss(mu_next, log_std_next, obs_next.type(th.float32))
+                    model_loss = self.world_model.calc_loss(mu_next, log_std_next, world_data.next_observations.type(th.float32))
 
                     self.world_model.optim.zero_grad()
                     model_loss.backward()
@@ -529,6 +517,11 @@ class SAC(OffPolicyAlgorithm):
         inner_mu_next = inner_mu_next.view(batch_size, self.K, -1).mean(dim=1)
         inner_logvar_next = inner_logvar_next.view(batch_size, self.K, -1).mean(dim=1) 
 
+        outer_mu_next = outer_mu_next[:, :,self.partial_obs[0]:self.partial_obs[1]]
+        outer_logvar_next = outer_logvar_next[:, :,self.partial_obs[0]:self.partial_obs[1]]
+        inner_mu_next = inner_mu_next[:, self.partial_obs[0]:self.partial_obs[1]]
+        inner_logvar_next = inner_logvar_next[:, self.partial_obs[0]:self.partial_obs[1]]
+
         kls = kl_div(outer_mu_next, outer_logvar_next.exp(), inner_mu_next[:, None], inner_logvar_next.exp()[:, None])
         kls = th.clip(kls, min=0)
 
@@ -536,6 +529,45 @@ class SAC(OffPolicyAlgorithm):
 
         info = {}
         self.world_model.train()
+        return cai, info
+
+    # @th.no_grad()
+    # def calc_causal_influence(self, states: th.Tensor):
+
+    #     self.world_model.eval()
+    #     batch_size = states.shape[0]
+
+    #     # Get transition distribution with action        
+
+    #     actions = th.rand(batch_size, self.K, *self.action_space.shape).to(self.device) * 2 - 1
+        
+    #     states = (states.unsqueeze(1).repeat(1, self.K, 1).view(-1, states.shape[-1]))
+    #     actions = actions.view(self.K * batch_size, *self.action_space.shape)
+
+    #     model_inp = th.concat((states, actions), dim=1).type(th.float32)
+    #     outer_mu_next, outer_logvar_next = self.world_model(model_inp)
+
+    #     outer_mu_next = outer_mu_next.view(batch_size, self.K, -1) 
+    #     outer_logvar_next = outer_logvar_next.view(batch_size, self.K, -1) 
+    #     # Get transition distribution with action averaged out
+        
+    #     inner_actions = th.rand(batch_size, self.K, *self.action_space.shape).to(self.device) * 2 - 1
+    #     inner_actions = inner_actions.view(self.K * batch_size, *self.action_space.shape)
+
+    #     model_inp = th.concat((states, inner_actions), dim=1).type(th.float32)
+
+    #     inner_mu_next, inner_logvar_next = self.world_model(model_inp)
+
+    #     inner_mu_next = inner_mu_next.view(batch_size, self.K, -1).mean(dim=1)
+    #     inner_logvar_next = inner_logvar_next.view(batch_size, self.K, -1).mean(dim=1) 
+
+    #     kls = kl_div(outer_mu_next, outer_logvar_next.exp(), inner_mu_next[:, None], inner_logvar_next.exp()[:, None])
+    #     kls = th.clip(kls, min=0)
+
+    #     cai = th.mean(kls, dim=1)    
+
+    #     info = {}
+    #     self.world_model.train()
         return cai, info
 
     def learn(
@@ -658,13 +690,8 @@ class SAC(OffPolicyAlgorithm):
             new_obs, rewards, dones, infos = env.step(actions)
             cais = np.zeros(rewards.shape)
             if self._last_original_obs is not None:
-
-                if self.partial_obs is None:
-                    obs = self._last_original_obs
-                else:
-                    obs = self._last_original_obs[:,self.partial_obs[0]:self.partial_obs[1]]
                 
-                obs = th.Tensor(obs).to(self.device)
+                obs = th.Tensor(self._last_original_obs).to(self.device)
                 cais, _ = self.calc_causal_influence(obs)
                 cais = cais.unsqueeze(1).cpu().numpy()
 

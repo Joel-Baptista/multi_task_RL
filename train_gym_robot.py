@@ -74,8 +74,7 @@ def main():
             cfg["algorithm"]["args"]["model_path"] = experiment_path
 
         model = algorithm_class(policy_class, 
-                                env, 
-                                verbose=0, 
+                                env,  
                                 tensorboard_log=f"{log_path}/{run.id}",
                                 **cfg.algorithm.args)
         # Setup Callbacks

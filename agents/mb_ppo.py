@@ -55,8 +55,10 @@ class MB_PPO(PPO):
         world_steps_to_train: int = -1,
         world_num_updates: int = 10,
         world_batch_size: int = 512,
+        lambda_cai: float = 1.0,
 
     ):
+        print(type(verbose))
         super().__init__(
             policy,
             env,
@@ -88,6 +90,12 @@ class MB_PPO(PPO):
         self.world_num_updates = world_num_updates
         self.world_steps_to_train = world_steps_to_train
         self.world_batch_size = world_batch_size
+        self.lambda_cai = lambda_cai
+        
+        if "partial_obs" in world_model.keys():
+            self.partial_obs = world_model["partial_obs"]
+        else:
+            self.partial_obs = None
 
         #TODO Find clever way to load world model when loading the algorithm
         if isinstance(world_model, dict):
@@ -182,6 +190,9 @@ class MB_PPO(PPO):
 
         callback.on_rollout_start()
 
+        cais_list = []
+        rewards_list = []
+        cais_and_rewards_list = []
         while n_steps < n_rollout_steps:
             if self.use_sde and self.sde_sample_freq > 0 and n_steps % self.sde_sample_freq == 0:
                 # Sample a new noise matrix
@@ -201,6 +212,17 @@ class MB_PPO(PPO):
 
             new_obs, rewards, dones, infos = env.step(clipped_actions)
 
+            obs = obs_as_tensor(self._last_obs, self.device)
+            cais, _ = self.calc_causal_influence(obs)
+            cais = cais.unsqueeze(1).cpu().numpy()
+
+            rewards_list.append(rewards)
+
+            rewards += self.lambda_cai * cais.squeeze(0)
+
+            cais_and_rewards_list.append(rewards)
+
+            cais_list.append(cais)
             self.num_timesteps += env.num_envs
 
             # Give access to local variables
@@ -241,23 +263,22 @@ class MB_PPO(PPO):
 
         # JB's
         
-        cai, info = self.calc_causal_influence(obs_as_tensor(rollout_buffer.observations, self.device))
-        cai = cai.unsqueeze(1)
-        #TODO CLip CAI in 100ish
-        rollout_buffer.rewards = rollout_buffer.rewards + cai.detach().cpu().numpy()
-        
         # log cai metrics
         self.logger.record("cai/cai", np.mean(
-            cai.squeeze(1).detach().cpu().numpy()
+            cais_list.squeeze(1).detach().cpu().numpy()
+            ))
+        self.logger.record("cai/rewards", np.mean(
+            rewards.squeeze(1).detach().cpu().numpy()
+            ))
+        self.logger.record("cai/cai_and_reward", np.mean(
+            rewards.squeeze(1).detach().cpu().numpy()
             ))
         self.logger.record("cai/cai_min", np.mean(
-            cai.squeeze(1).min().detach().cpu().numpy()
+            cais_list.squeeze(1).min().detach().cpu().numpy()
             ))
         self.logger.record("cai/cai_max", np.mean(
-            cai.squeeze(1).max().detach().cpu().numpy()
+            cais_list.squeeze(1).max().detach().cpu().numpy()
             ))
-        for log in info:
-            self.logger.record(f"cai/{log}", np.mean(info[log]))
 
         with th.no_grad():
             # Compute value for the last timestep
@@ -271,55 +292,44 @@ class MB_PPO(PPO):
     
     @th.no_grad()
     def calc_causal_influence(self, states: th.Tensor):
+
         self.world_model.eval()
-        states = states.squeeze(1)
+        batch_size = states.shape[0]
+
         # Get transition distribution with action        
-        # mu_mean, _, log_probs = self.policy(states)
-        pi_features = self.policy.extract_features(states)
-        latent_pi = self.policy.mlp_extractor.forward_actor(pi_features)
-        dist = self.policy._get_action_dist_from_latent(latent_pi)
 
-        outer_actions = th.zeros((self.K, states.shape[0], *self.action_space.shape)).to(self.device)
-        outer_states = th.zeros((self.K, states.shape[0], *self.observation_space.shape)).to(self.device)
-
-        for j in range(0, self.K):
-            actions = dist.get_actions(deterministic=False).to(self.device)
-            outer_actions[j] = actions
-            outer_states[j] = states
+        actions = th.rand(batch_size, self.K, *self.action_space.shape).to(self.device) * 2 - 1
         
-        outer_states = outer_states.view(self.K * states.shape[0], *self.observation_space.shape)
-        outer_actions = outer_actions.view(self.K * states.shape[0], *self.action_space.shape)
+        states = (states.unsqueeze(1).repeat(1, self.K, 1).view(-1, states.shape[-1]))
+        actions = actions.view(self.K * batch_size, *self.action_space.shape)
 
-        model_inp = th.concat((outer_states, outer_actions), dim=1).type(th.float32)
+        model_inp = th.concat((states, actions), dim=1).type(th.float32)
         outer_mu_next, outer_logvar_next = self.world_model(model_inp)
 
+        outer_mu_next = outer_mu_next.view(batch_size, self.K, -1) 
+        outer_logvar_next = outer_logvar_next.view(batch_size, self.K, -1) 
         # Get transition distribution with action averaged out
-        inner_actions = th.zeros((self.K, states.shape[0], *self.action_space.shape)).to(self.device)
-        for i in range(0, self.K):
-            actions = dist.get_actions(deterministic=False)
-            inner_actions[i] = actions
+        
+        inner_actions = th.rand(batch_size, self.K, *self.action_space.shape).to(self.device) * 2 - 1
+        inner_actions = inner_actions.view(self.K * batch_size, *self.action_space.shape)
 
-        inner_actions = inner_actions.view(self.K * states.shape[0], *self.action_space.shape)
-
-        model_inp = th.concat((states.repeat((self.K, 1)), inner_actions), dim=1).type(th.float32)
+        model_inp = th.concat((states, inner_actions), dim=1).type(th.float32)
 
         inner_mu_next, inner_logvar_next = self.world_model(model_inp)
 
-        inner_mu_next = inner_mu_next.view(self.K, states.shape[0], *self.observation_space.shape).mean(dim=0).repeat((self.K, 1))
-        inner_logvar_next = inner_logvar_next.view(self.K, states.shape[0], *self.observation_space.shape).mean(dim=0).repeat((self.K, 1))
+        inner_mu_next = inner_mu_next.view(batch_size, self.K, -1).mean(dim=1)
+        inner_logvar_next = inner_logvar_next.view(batch_size, self.K, -1).mean(dim=1) 
 
-        kls = kl_div(outer_mu_next, outer_logvar_next.exp(), inner_mu_next, inner_logvar_next.exp())
+        outer_mu_next = outer_mu_next[:, :,self.partial_obs[0]:self.partial_obs[1]]
+        outer_logvar_next = outer_logvar_next[:, :,self.partial_obs[0]:self.partial_obs[1]]
+        inner_mu_next = inner_mu_next[:, self.partial_obs[0]:self.partial_obs[1]]
+        inner_logvar_next = inner_logvar_next[:, self.partial_obs[0]:self.partial_obs[1]]
+
+        kls = kl_div(outer_mu_next, outer_logvar_next.exp(), inner_mu_next[:, None], inner_logvar_next.exp()[:, None])
         kls = th.clip(kls, min=0)
-        kls = kls.view(self.K, states.shape[0])
 
-        cai = th.mean(kls, dim=0)      
+        cai = th.mean(kls, dim=1)    
 
-        info = { 
-            "outer_mu_next": outer_mu_next.mean().mean().detach().cpu().numpy(),
-            "inner_mu_next": inner_mu_next.mean().mean().detach().cpu().numpy(),
-            "outer_log_std_next": outer_logvar_next.mean().mean().detach().cpu().numpy(),
-            "inner_log_std_next": inner_logvar_next.mean().mean().detach().cpu().numpy(),
-        }   
-
+        info = {}
         self.world_model.train()
         return cai, info
