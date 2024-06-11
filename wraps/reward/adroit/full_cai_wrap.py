@@ -7,7 +7,7 @@ import numpy as np
 ActType = TypeVar("ActType")
 ObsType = TypeVar("ObsType")
 
-class   CAI_WRAP(RewardWrapper):
+class FULL_CAI_WRAP(RewardWrapper):
     def __init__(self, env: Env, reward_scale: float = 1.0):
         super().__init__(env)
         self.env = env
@@ -38,9 +38,8 @@ class   CAI_WRAP(RewardWrapper):
         reward = - 0.1 * np.linalg.norm(hand_ball_diff)
 
         if state_dict["obj_pos"][2] > 0.04:
-            reward += 1.0
-            new_info["is_success"] = True
-                
+            reward += 1.0 - np.linalg.norm(ball_target_diff)
+              
         # Correct env's error. It adds instead of subtracting, so we subtract two times to correct it.
         
         return observation, reward, terminated, truncated, new_info
