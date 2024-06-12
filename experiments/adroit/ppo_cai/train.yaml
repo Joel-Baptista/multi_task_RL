@@ -2,7 +2,7 @@ project: "Adroit"
 total_timesteps: 50_000_000
 checkpoints: 1_000
 eval_freq: 10_000
-record_freq: -1
+record_freq: 10_000
 #record_freq: 100_000
 
 env:
@@ -37,9 +37,9 @@ algorithm:
   args:
     K: 64
     world_steps_to_train: 1 #-1 to not train 
-    world_num_updates: 1
+    world_num_updates: 10
     world_batch_size: 512
-    lambda_cai: 0.002
+    lambda_cai: 0.02
     learning_rate: 0.00003
     n_steps: 4096
     batch_size: 64
@@ -61,8 +61,8 @@ algorithm:
     world_model:
       name: "mlp"
       module: "models.world_model"
-      pretrained: False
-      path: Null
+      pretrained: True
+      path: "models/Adroit/reloc_world/1"
       partial_obs: [30, 39] #can be Null for full observation
       args:
         hidden_dims: [4096, 4096, 4096, 4096, 4096, 2048, 1024, 512]

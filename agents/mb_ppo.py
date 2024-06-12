@@ -21,7 +21,7 @@ import time
 import os
 
 _LOG_2PI = math.log(2 * math.pi)
-MODELS = os.getenv("PHD_MODELS")
+MODELS = os.getenv("PHD_RESULTS")
 
 class MB_PPO(PPO):
     def __init__(
@@ -104,6 +104,7 @@ class MB_PPO(PPO):
                 **world_model['args']
                 )
             # print(f"For Entropy: {float(-np.prod(self.env.action_space.shape).astype(np.float32))}")
+            print(f"{MODELS}/{world_model['path']}/world_model.pt")
             if world_model["pretrained"]:
                 self.world_model.load_state_dict(
                     th.load(f"{MODELS}/{world_model['path']}/world_model.pt",
