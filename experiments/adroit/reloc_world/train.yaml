@@ -10,6 +10,7 @@ env:
   # name: "AdroitHandRelocate-v3"
   name: "AdroitHandRelocate-v1"
   path: "envs.adroit_reloc"
+  render: "human"
   args:
     # reward_type: "sparse"
     # tasks_to_complete:
@@ -35,9 +36,11 @@ policy:
 algorithm: 
   args:
     learning_rate: 0.0003
+    buffer_size: 10_000_000
     train_freq: 1
     batch_size: 512
     learning_starts: 1024
+    device: "cuda:2"
     world_model_kwargs:
       name: "mlp"
       module: "models.world_model"
@@ -45,3 +48,6 @@ algorithm:
       args:
         hidden_dims: [4096, 4096, 4096, 4096, 4096, 2048, 1024, 512]
         hidden_activation: "ReLU"
+        dropout: 0.2
+        weight_decay: 0.00001
+        std: "auto" # "auto" for adaptable; number for fixed

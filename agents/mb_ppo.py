@@ -58,32 +58,31 @@ class MB_PPO(PPO):
         lambda_cai: float = 1.0,
 
     ):
-        print(type(verbose))
         super().__init__(
-            policy,
-            env,
-            learning_rate,
-            n_steps,
-            batch_size,
-            n_epochs,
-            gamma,
-            gae_lambda,
-            clip_range,
-            clip_range_vf,
-            normalize_advantage,
-            ent_coef,
-            vf_coef,
-            max_grad_norm,
-            use_sde,
-            sde_sample_freq,
-            target_kl,
-            stats_window_size,
-            tensorboard_log,
-            policy_kwargs,
-            verbose,
-            seed,
-            device,
-            _init_setup_model,
+            policy=policy,
+            env=env,
+            learning_rate=learning_rate,
+            n_steps=n_steps,
+            batch_size=batch_size,
+            n_epochs=n_epochs,
+            gamma=gamma,
+            gae_lambda=gae_lambda,
+            clip_range=clip_range,
+            clip_range_vf=clip_range_vf,
+            normalize_advantage=normalize_advantage,
+            ent_coef=ent_coef,
+            vf_coef=vf_coef,
+            max_grad_norm=max_grad_norm,
+            use_sde=use_sde,
+            sde_sample_freq=sde_sample_freq,
+            target_kl=target_kl,
+            stats_window_size=stats_window_size,
+            tensorboard_log=tensorboard_log,
+            policy_kwargs=policy_kwargs,
+            verbose=verbose,
+            seed=seed,
+            device=device,
+            _init_setup_model=_init_setup_model,
         )
         # JB's
         self.K = K
@@ -189,10 +188,11 @@ class MB_PPO(PPO):
             self.policy.reset_noise(env.num_envs)
 
         callback.on_rollout_start()
+        
+        cais_list = np.zeros((n_rollout_steps,))
+        rewards_list = np.zeros((n_rollout_steps,))
+        cais_and_rewards_list = np.zeros((n_rollout_steps,))
 
-        cais_list = []
-        rewards_list = []
-        cais_and_rewards_list = []
         while n_steps < n_rollout_steps:
             if self.use_sde and self.sde_sample_freq > 0 and n_steps % self.sde_sample_freq == 0:
                 # Sample a new noise matrix
@@ -216,13 +216,13 @@ class MB_PPO(PPO):
             cais, _ = self.calc_causal_influence(obs)
             cais = cais.unsqueeze(1).cpu().numpy()
 
-            rewards_list.append(rewards)
+            rewards_list[n_steps] = rewards
 
             rewards += self.lambda_cai * cais.squeeze(0)
 
-            cais_and_rewards_list.append(rewards)
+            cais_and_rewards_list[n_steps] = rewards
 
-            cais_list.append(cais)
+            cais_list[n_steps] = cais
             self.num_timesteps += env.num_envs
 
             # Give access to local variables
@@ -262,22 +262,22 @@ class MB_PPO(PPO):
             self._last_episode_starts = dones
 
         # JB's
-        
+        print(np.array(cais_list).shape)
         # log cai metrics
         self.logger.record("cai/cai", np.mean(
-            cais_list.squeeze(1).detach().cpu().numpy()
+            cais_list
             ))
         self.logger.record("cai/rewards", np.mean(
-            rewards.squeeze(1).detach().cpu().numpy()
+            rewards_list
             ))
         self.logger.record("cai/cai_and_reward", np.mean(
-            rewards.squeeze(1).detach().cpu().numpy()
+            cais_and_rewards_list
             ))
-        self.logger.record("cai/cai_min", np.mean(
-            cais_list.squeeze(1).min().detach().cpu().numpy()
+        self.logger.record("cai/cai_min", np.min(
+            cais_list
             ))
-        self.logger.record("cai/cai_max", np.mean(
-            cais_list.squeeze(1).max().detach().cpu().numpy()
+        self.logger.record("cai/cai_max", np.max(
+            cais_list
             ))
 
         with th.no_grad():

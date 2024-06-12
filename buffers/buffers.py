@@ -220,3 +220,5 @@ class ReplayBufferCAI(BaseBuffer):
         if dtype == np.float64:
             return np.float32
         return dtype
+    
+

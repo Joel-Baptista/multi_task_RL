@@ -57,7 +57,7 @@ algorithm:
     target_kl: 0.27
     seed: Null
     stats_window_size: 1_000
-    device: "cuda:3"
+    device: "cuda:2"
     world_model:
       name: "mlp"
       module: "models.world_model"
