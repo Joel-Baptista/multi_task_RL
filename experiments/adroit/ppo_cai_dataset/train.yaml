@@ -2,8 +2,7 @@ project: "Adroit"
 total_timesteps: 50_000_000
 checkpoints: 1_000
 eval_freq: 10_000
-# record_freq: 10_000
-record_freq: -1
+record_freq: 10_000
 #record_freq: 100_000
 
 env:
@@ -33,8 +32,8 @@ policy:
   module: "stable_baselines3.ppo.policies"
 
 algorithm: 
-  name: "MB_PPO"
-  module: "agents.mb_ppo"
+  name: "MB_PPO_DATASET"
+  module: "agents.mb_ppo_dataset"
   args:
     K: 64
     world_steps_to_train: 1 #-1 to not train 
@@ -65,6 +64,7 @@ algorithm:
       pretrained: True
       path: "models/Adroit/reloc_world/1"
       partial_obs: [30, 39] #can be Null for full observation
+      dataset_name: "adroit-dataset-v1"
       args:
         hidden_dims: [4096, 4096, 4096, 4096, 4096, 2048, 1024, 512]
         hidden_activation: "ReLU"

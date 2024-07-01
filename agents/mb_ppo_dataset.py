@@ -26,7 +26,7 @@ from utils.dataloader import collate_fn
 _LOG_2PI = math.log(2 * math.pi)
 MODELS = os.getenv("PHD_RESULTS")
 
-class MB_PPO(PPO):
+class MB_PPO_DATASET(PPO):
     def __init__(
         self,
         policy: str | type[ActorCriticPolicy],
@@ -117,24 +117,23 @@ class MB_PPO(PPO):
             print(self.world_model)
 
         
-        # dataset_name = world_model.get("dataset_name", None)
+        dataset_name = world_model.get("dataset_name", None)
             
-        # if dataset_name is not None:
-        #     try:
-        #         dataset = minari.load_dataset(dataset_name)
-        #     except:
-        #         dataset = minari.load_dataset(dataset_name, download=True)
+        if dataset_name is not None:
+            try:
+                dataset = minari.load_dataset(dataset_name)
+            except:
+                dataset = minari.load_dataset(dataset_name, download=True)
 
-        # self.dataset = dataset
+        self.dataset = dataset
 
-        # self.dataset_loader = DataLoader(dataset, batch_size=1, num_workers=3,shuffle=True, collate_fn=collate_fn)
+        self.dataset_loader = DataLoader(dataset, batch_size=4, num_workers=3,shuffle=True, collate_fn=collate_fn)
         
 
     def train(self) -> None:
         # Train model before PPO
         world_model_losses = []
         self.world_model.train()
-        # print("TRAIN WORLD MODEL")
 
         observations = self.rollout_buffer.observations.squeeze(1) 
         actions = self.rollout_buffer.actions.squeeze(1) 
@@ -153,27 +152,29 @@ class MB_PPO(PPO):
             state_next[i] = self.rollout_buffer.observations[i+1]
 
         for _ in range(0, self.world_num_updates):
+            indices = np.random.choice(len(state_actions), int(self.world_batch_size / 2), replace=False)
+            
+            batch = self.dataset_loader.__iter__().__next__() #TODO for now the world batch size caps at 800. Fix to be adaptable
+            
+            indices_dataset = np.random.choice(len(batch[0]), self.world_batch_size - len(indices), replace=False)
+            
+            sampled_state_actions = state_actions[indices]
+            sampled_state_next = state_next[indices]
 
-            # indices = np.random.choice(len(state_actions), self.world_batch_size, replace=False)
-            # sampled_state_actions = state_actions[indices]
-            # sampled_state_next = state_next[indices]
+            sampled_state_actions = np.concatenate((sampled_state_actions, batch[0][indices_dataset]))
+            sampled_state_next = np.concatenate((sampled_state_next, batch[1][indices_dataset]))
 
-            for batch_idx in range(0, state_actions.shape[0], self.world_batch_size): 
-                
-                end_idx = batch_idx + self.world_batch_size
-                if end_idx > state_actions.shape[0]: end_idx = state_actions.shape[0]
+            model_inp = obs_as_tensor(sampled_state_actions, device=self.device).type(th.float32)
 
-                model_inp = obs_as_tensor(state_actions, device=self.device)[batch_idx: end_idx]
+            mu_next, log_std_next = self.world_model(model_inp)
 
-                mu_next, log_std_next = self.world_model(model_inp.type(th.float32))
+            model_loss = self.world_model.calc_loss(mu_next, log_std_next, obs_as_tensor(sampled_state_next, device=self.device))
 
-                model_loss = self.world_model.calc_loss(mu_next, log_std_next, obs_as_tensor(state_next, device=self.device)[batch_idx: end_idx])
+            self.world_model.optim.zero_grad()
+            model_loss.backward()
+            self.world_model.optim.step()
 
-                self.world_model.optim.zero_grad()
-                model_loss.backward()
-                self.world_model.optim.step()
-
-                world_model_losses.append(model_loss.item())
+            world_model_losses.append(model_loss.item())
 
         self.logger.record("world_model/world_model_loss", np.mean(world_model_losses))
 
@@ -285,7 +286,7 @@ class MB_PPO(PPO):
             self._last_episode_starts = dones
 
         # JB's
-        print(np.array(cais_list).shape)
+
         # log cai metrics
         self.logger.record("cai/cai", np.mean(
             cais_list
