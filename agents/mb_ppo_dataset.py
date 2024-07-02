@@ -344,10 +344,11 @@ class MB_PPO_DATASET(PPO):
         inner_mu_next = inner_mu_next.view(batch_size, self.K, -1).mean(dim=1)
         inner_logvar_next = inner_logvar_next.view(batch_size, self.K, -1).mean(dim=1) 
 
-        outer_mu_next = outer_mu_next[:, :,self.partial_obs[0]:self.partial_obs[1]]
-        outer_logvar_next = outer_logvar_next[:, :,self.partial_obs[0]:self.partial_obs[1]]
-        inner_mu_next = inner_mu_next[:, self.partial_obs[0]:self.partial_obs[1]]
-        inner_logvar_next = inner_logvar_next[:, self.partial_obs[0]:self.partial_obs[1]]
+        if self.partial_obs is not None:
+            outer_mu_next = outer_mu_next[:, :,self.partial_obs[0]:self.partial_obs[1]]
+            outer_logvar_next = outer_logvar_next[:, :,self.partial_obs[0]:self.partial_obs[1]]
+            inner_mu_next = inner_mu_next[:, self.partial_obs[0]:self.partial_obs[1]]
+            inner_logvar_next = inner_logvar_next[:, self.partial_obs[0]:self.partial_obs[1]]
 
         kls = kl_div(outer_mu_next, outer_logvar_next.exp(), inner_mu_next[:, None], inner_logvar_next.exp()[:, None])
         kls = th.clip(kls, min=0)
